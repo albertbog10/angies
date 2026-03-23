@@ -418,54 +418,32 @@ const buildCupcakePaymentPayload = (order) => ({
   order,
 });
 
-const checkoutFunctionEndpoints = [
-  "/api/create-square-payment-link",
-  "/.netlify/functions/create-square-payment-link",
-];
-
 const requestCheckoutLink = async (payload) => {
-  let lastErrorMessage = "Unable to start Square checkout right now.";
+  const response = await fetch("/api/create-square-payment-link", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 
-  for (const endpoint of checkoutFunctionEndpoints) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const rawBody = await response.text();
-      let data = {};
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {};
-      } catch {
-        data = {};
-      }
-
-      if (response.ok && data.checkoutUrl) {
-        return data.checkoutUrl;
-      }
-
-      lastErrorMessage =
-        data.error ||
-        rawBody ||
-        `Unable to start Square checkout from ${endpoint}.`;
-
-      // If the endpoint simply doesn't exist on this host, try the next one.
-      if (response.status === 404 || response.status === 405) {
-        continue;
-      }
-
-      throw new Error(lastErrorMessage);
-    } catch (error) {
-      lastErrorMessage =
-        error instanceof Error ? error.message : lastErrorMessage;
-    }
+  const rawBody = await response.text();
+  let data = {};
+  try {
+    data = rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    data = {};
   }
 
-  throw new Error(lastErrorMessage);
+  if (!response.ok || !data.checkoutUrl) {
+    throw new Error(
+      data.error ||
+        rawBody ||
+        "Unable to start Square checkout right now.",
+    );
+  }
+
+  return data.checkoutUrl;
 };
 
 const saveCheckoutReceipt = (payload) => {
