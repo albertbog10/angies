@@ -139,7 +139,7 @@ const sendTwilioSms = async (messageBody) => {
   }
 };
 
-const sendResendEmail = async ({ toEmail, subject, body }) => {
+const sendResendEmail = async ({ toEmail, subject, body, idempotencyKey }) => {
   const apiKey = process.env.RESEND_API_KEY || "";
   const fromEmail =
     process.env.ORDER_FROM_EMAIL || "Angies Bakery <onboarding@resend.dev>";
@@ -155,6 +155,7 @@ const sendResendEmail = async ({ toEmail, subject, body }) => {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from: fromEmail,
@@ -178,14 +179,16 @@ const parseEmailFromNote = (note) => {
 
 const buildOrderDetails = (payment) => {
   const amount = formatAmount(payment.amount_money);
-  const note = payment.note || payment.payment_note || "No payment note provided.";
+  const note = payment.note || payment.payment_note || "";
   const orderId = payment.order_id || "Unknown";
   const paymentId = payment.id || "Unknown";
   const details = note
-    .split("|")
-    .map((piece) => piece.trim())
-    .filter(Boolean)
-    .join("\n");
+    ? note
+        .split("|")
+        .map((piece) => piece.trim())
+        .filter(Boolean)
+        .join("\n")
+    : "Detailed cake info was not included in the payment note.";
 
   return {
     amount,
@@ -254,6 +257,9 @@ const sendOrderNotification = async (payment) => {
   const messageBody = buildNotificationBody(payment);
   const ownerEmail = process.env.ORDER_ALERT_EMAIL || "";
   const customerEmail = getCustomerEmail(payment);
+  const normalizedOwnerEmail = ownerEmail.trim().toLowerCase();
+  const normalizedCustomerEmail = customerEmail.trim().toLowerCase();
+  const notificationId = payment.id || payment.order_id || crypto.randomUUID();
 
   if (channelPreference === "email") {
     if (!hasResendConfig()) {
@@ -266,22 +272,29 @@ const sendOrderNotification = async (payment) => {
       throw new Error("Missing ORDER_ALERT_EMAIL for owner notifications.");
     }
 
-    if (!customerEmail) {
-      throw new Error("Customer email is missing from the payment payload.");
-    }
-
     await sendResendEmail({
       toEmail: ownerEmail,
       subject: "New paid custom order",
       body: messageBody,
+      idempotencyKey: `owner-${notificationId}`,
     });
+
+    if (!normalizedCustomerEmail) {
+      return { channel: "email", ownerEmail, customerEmail: "", customerEmailSent: false };
+    }
+
+    // Avoid duplicate inbox noise when owner and customer addresses are the same.
+    if (normalizedCustomerEmail === normalizedOwnerEmail) {
+      return { channel: "email", ownerEmail, customerEmail, customerEmailSent: false };
+    }
 
     await sendResendEmail({
       toEmail: customerEmail,
       subject: "Your Angies Bakery receipt",
       body: buildCustomerReceiptBody(payment),
+      idempotencyKey: `customer-${notificationId}-${normalizedCustomerEmail}`,
     });
-    return { channel: "email", ownerEmail, customerEmail };
+    return { channel: "email", ownerEmail, customerEmail, customerEmailSent: true };
   }
 
   if (channelPreference === "sms") {
@@ -301,13 +314,18 @@ const sendOrderNotification = async (payment) => {
         toEmail: ownerEmail,
         subject: "New paid custom order",
         body: messageBody,
+        idempotencyKey: `owner-${notificationId}`,
       });
-      await sendResendEmail({
-        toEmail: customerEmail,
-        subject: "Your Angies Bakery receipt",
-        body: buildCustomerReceiptBody(payment),
-      });
-      return { channel: "email", ownerEmail, customerEmail };
+      if (normalizedCustomerEmail && normalizedCustomerEmail !== normalizedOwnerEmail) {
+        await sendResendEmail({
+          toEmail: customerEmail,
+          subject: "Your Angies Bakery receipt",
+          body: buildCustomerReceiptBody(payment),
+          idempotencyKey: `customer-${notificationId}-${normalizedCustomerEmail}`,
+        });
+        return { channel: "email", ownerEmail, customerEmail, customerEmailSent: true };
+      }
+      return { channel: "email", ownerEmail, customerEmail, customerEmailSent: false };
     }
 
     if (hasTwilioConfig()) {
@@ -369,10 +387,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing payment ID in webhook payload." });
     }
 
-    const payment =
-      embeddedPayment && embeddedPayment.status
-        ? embeddedPayment
-        : await fetchPaymentById(paymentId);
+    let payment = embeddedPayment;
+
+    // Always try to fetch the full payment object so owner emails include all cake details.
+    if (paymentId && process.env.SQUARE_ACCESS_TOKEN) {
+      try {
+        payment = await fetchPaymentById(paymentId);
+      } catch (error) {
+        if (!embeddedPayment) {
+          throw error;
+        }
+      }
+    }
 
     if (payment.status !== "COMPLETED") {
       return res.status(200).json({ ignored: true, reason: `Payment status is ${payment.status}` });
