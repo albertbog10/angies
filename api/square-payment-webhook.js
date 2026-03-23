@@ -93,6 +93,25 @@ const fetchPaymentById = async (paymentId) => {
   return payload.payment;
 };
 
+const mergePaymentDetails = (preferred = {}, fallback = {}) => {
+  const mergedNote =
+    preferred.note ||
+    preferred.payment_note ||
+    fallback.note ||
+    fallback.payment_note ||
+    "";
+  const mergedBuyerEmail =
+    preferred.buyer_email_address || fallback.buyer_email_address || "";
+
+  return {
+    ...fallback,
+    ...preferred,
+    note: mergedNote,
+    payment_note: preferred.payment_note || fallback.payment_note || mergedNote,
+    buyer_email_address: mergedBuyerEmail,
+  };
+};
+
 const hasTwilioConfig = () =>
   Boolean(
     process.env.TWILIO_ACCOUNT_SID &&
@@ -387,17 +406,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing payment ID in webhook payload." });
     }
 
-    let payment = embeddedPayment;
+    let payment = embeddedPayment || null;
 
     // Always try to fetch the full payment object so owner emails include all cake details.
     if (paymentId && process.env.SQUARE_ACCESS_TOKEN) {
       try {
-        payment = await fetchPaymentById(paymentId);
+        const fetchedPayment = await fetchPaymentById(paymentId);
+        payment = mergePaymentDetails(fetchedPayment, payment || {});
       } catch (error) {
         if (!embeddedPayment) {
           throw error;
         }
       }
+    }
+
+    if (!payment) {
+      throw new Error("Unable to load payment details for webhook notification.");
     }
 
     if (payment.status !== "COMPLETED") {
