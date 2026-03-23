@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 const SQUARE_API_VERSION = "2026-01-22";
 const SQUARE_GET_PAYMENT_URL = "https://connect.squareup.com/v2/payments";
+const SQUARE_GET_ORDER_URL = "https://connect.squareup.com/v2/orders";
 
 const getHeader = (headers = {}, key) => {
   const target = String(key || "").toLowerCase();
@@ -93,6 +94,59 @@ const fetchPaymentById = async (paymentId) => {
   return payload.payment;
 };
 
+const fetchOrderById = async (orderId) => {
+  const response = await fetch(
+    `${SQUARE_GET_ORDER_URL}/${encodeURIComponent(orderId)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
+        "Square-Version": SQUARE_API_VERSION,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    const detail = payload.errors?.[0]?.detail || payload.errors?.[0]?.code;
+    throw new Error(detail || "Square order lookup failed.");
+  }
+
+  return payload.order;
+};
+
+const collectOrderDetailsText = (order = {}) => {
+  const note = String(order.note || "").trim();
+  const lineItemSummaries = Array.isArray(order.line_items)
+    ? order.line_items
+        .map((lineItem) => {
+          const name = String(lineItem?.name || "").trim();
+          const quantity = String(lineItem?.quantity || "").trim();
+          if (!name) {
+            return "";
+          }
+          return quantity ? `Item: ${name} x${quantity}` : `Item: ${name}`;
+        })
+        .filter(Boolean)
+    : [];
+  const lineItemNotes = Array.isArray(order.line_items)
+    ? order.line_items
+        .map((lineItem) => {
+          const itemNote = String(lineItem?.note || "").trim();
+          const name = String(lineItem?.name || "").trim();
+          if (!itemNote) {
+            return "";
+          }
+          return name ? `${name}: ${itemNote}` : itemNote;
+        })
+        .filter(Boolean)
+    : [];
+
+  return [note, ...lineItemSummaries, ...lineItemNotes].filter(Boolean).join(" | ");
+};
+
 const mergePaymentDetails = (preferred = {}, fallback = {}) => {
   const mergedNote =
     preferred.note ||
@@ -109,6 +163,22 @@ const mergePaymentDetails = (preferred = {}, fallback = {}) => {
     note: mergedNote,
     payment_note: preferred.payment_note || fallback.payment_note || mergedNote,
     buyer_email_address: mergedBuyerEmail,
+  };
+};
+
+const mergeOrderDetailsIntoPayment = (payment = {}, order = {}) => {
+  const orderDetailsText = collectOrderDetailsText(order);
+  if (!orderDetailsText) {
+    return payment;
+  }
+
+  const existingNote = payment.note || payment.payment_note || "";
+  const mergedNote = existingNote || orderDetailsText;
+
+  return {
+    ...payment,
+    note: mergedNote,
+    payment_note: payment.payment_note || mergedNote,
   };
 };
 
@@ -417,6 +487,19 @@ export default async function handler(req, res) {
         if (!embeddedPayment) {
           throw error;
         }
+      }
+    }
+
+    if (
+      payment?.order_id &&
+      !String(payment.note || payment.payment_note || "").trim() &&
+      process.env.SQUARE_ACCESS_TOKEN
+    ) {
+      try {
+        const order = await fetchOrderById(payment.order_id);
+        payment = mergeOrderDetailsIntoPayment(payment, order);
+      } catch {
+        // If order lookup fails, continue with existing payment payload.
       }
     }
 

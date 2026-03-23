@@ -134,15 +134,18 @@ const buildCakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
   }
 
   const paymentNote = [
-    `Cake pickup: ${order.pickupDate} ${order.pickupTime}`,
+    "Order type: Custom cake",
+    `Pickup date: ${order.pickupDate}`,
+    `Pickup time: ${order.pickupTime}`,
     `Customer: ${order.customerName}`,
     `Phone: ${order.phone}`,
     `Email: ${order.email}`,
-    `Flavor: ${getLabel("flavor", order.flavor)}`,
+    `Cake size: ${size.label}`,
+    `Cake flavor: ${getLabel("flavor", order.flavor)}`,
     `Included filling: ${getLabel("filling", order.filling)}`,
     `Extra filling: ${order.extraFilling === "none" ? "None" : getLabel("filling", order.extraFilling)}`,
     `Frosting: ${getLabel("frosting", order.frosting)}`,
-    `Outside color: ${getLabel("outsideColor", order.outsideColor)}`,
+    `Outside cake color: ${getLabel("outsideColor", order.outsideColor)}`,
     `Message: ${order.inscription || "None"}`,
     `Notes: ${order.notes || "None"}`,
   ].join(" | ").slice(0, 500);
@@ -154,6 +157,7 @@ const buildCakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
     description: `Custom cake order for ${order.customerName}`,
     order: {
       location_id: process.env.SQUARE_LOCATION_ID,
+      note: paymentNote,
       line_items: lineItems,
     },
     checkout_options: {
@@ -199,12 +203,14 @@ const buildCupcakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
   }
 
   const paymentNote = [
-    `Cupcake pickup: ${order.pickupDate} ${order.pickupTime}`,
+    "Order type: Custom cupcakes",
+    `Pickup date: ${order.pickupDate}`,
+    `Pickup time: ${order.pickupTime}`,
     `Customer: ${order.customerName}`,
     `Phone: ${order.phone}`,
     `Email: ${order.email}`,
     `Quantity: ${quantity}`,
-    `Flavor: ${getLabel("flavor", order.flavor)}`,
+    `Cupcake flavor: ${getLabel("flavor", order.flavor)}`,
     `Filling: ${order.filling === "none" ? "None" : getLabel("filling", order.filling)}`,
     `Cupcake color: ${getLabel("outsideColor", order.outsideColor)}`,
     `Notes: ${order.notes || "None"}`,
@@ -217,6 +223,7 @@ const buildCupcakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
     description: `Custom cupcake order for ${order.customerName}`,
     order: {
       location_id: process.env.SQUARE_LOCATION_ID,
+      note: paymentNote,
       line_items: lineItems,
     },
     checkout_options: {
