@@ -23,6 +23,8 @@ const mapsHref =
 const phoneHref = "tel:+17325159515";
 const homeHref = "/";
 const cakeOrderHref = "/cake-order.html";
+const googleReviewsHref =
+  "https://www.google.com/search?sca_esv=6b7c40959298e02e&sxsrf=ANbL-n7MV0LRnYsbknyQyqMlUsF1LJ7PEw:1774329520383&si=AL3DRZEsmMGCryMMFSHJ3StBhOdZ2-6yYkXd_doETEE1OR-qOR-vsUvH74q32ic0Qke-UwUVTlsfc5hlMFaap8qiNGNvDS_X3MGZ6JNZ01VlZDm9TXzfnwUM1Ym_a_xO0xyU7xYxhcU_GWmSqDd4s2e60Q0ndBviRQ%3D%3D&q=Angie%27s+Cafe+and+Bakery+Reviews&sa=X&ved=2ahUKEwihoJvG5LeTAxWOEVkFHW0rCAUQ0bkNegQILBAF&biw=916&bih=686&dpr=2";
 const heroPhoto = businessPhotos[0];
 const empanadaPhoto = empanadaPhotos[0];
 const customOrderCakePhoto = "/images/food/cake1.png";
@@ -35,7 +37,7 @@ const businessHours = [
   ["Thursday", "11 AM - 7 PM"],
   ["Friday", "11 AM - 7 PM"],
   ["Saturday", "11 AM - 7 PM"],
-  ["Sunday", "8 AM - 2 PM"],
+  ["Sunday", "9 AM - 3 PM"],
   ["Monday", "11 AM - 7 PM"],
 ];
 
@@ -45,19 +47,26 @@ const highlightCards = [
     title: "Custom cake orders",
     description:
       "Birthday, baby shower, and themed cakes get a dedicated spotlight right on the homepage.",
+    actionLabel: "Order custom cake",
+    actionHref: cakeOrderHref,
+  },
+];
+
+const reviewHighlights = [
+  {
+    title: "Cake, juices, and empanadas",
+    text:
+      "Great Dominican Bakery. We went to order a cake (Which was great, by the way) and had to order dominican rice, beans and pernil, plus some empanadas. Great juices, I ordered a morir soñando that tasted like heaven. Ambience is so romantic, great for dates.",
   },
   {
-    kicker: "Sunday hours",
-    title: "Open Sundays",
-    detail: "8 AM - 2 PM",
-    description:
-      "Join us Sunday morning for breakfast, brunch, coffee, and bakery favorites from 8 AM to 2 PM.",
+    title: "Iced cappuccinos and cute decor",
+    text:
+      "She makes the best iced cappuccinos 10/10 and consistent Everytime. The decor inside is so cute as well! I have to visit Everytime I'm in the area ❤️❤️❤️",
   },
   {
-    kicker: "All in one stop",
-    title: "Bakery plus kitchen",
-    description:
-      "Coffee, empanadas, lunch plates, and cakes are all in one place.",
+    title: "Tres leches and hot ginger tea",
+    text:
+      "Love the Tres Leches Postre, please try her customized Hot Ginger Tea with fruits inside. Also, the chicken sandwich is delicious 😋😋",
   },
 ];
 
@@ -328,62 +337,6 @@ const formatPickupTime = (value) => {
   const suffix = hours >= 12 ? "PM" : "AM";
   const normalizedHours = hours % 12 || 12;
   return `${normalizedHours}:${minutes} ${suffix}`;
-};
-
-const buildCakeOrderSummary = (order) => {
-  const event = findOption(cakeEventOptions, order.eventType);
-  const size = findOption(cakeSizeOptions, order.cakeSize);
-  const flavor = findOption(cakeFlavorOptions, order.flavor);
-  const filling = findOption(cakeFillingOptions, order.filling);
-  const extraFilling = findOption(cakeFillingOptions, order.extraFilling);
-  const frosting = findOption(cakeFrostingOptions, order.frosting);
-  const outsideColor = findOption(cakeColorOptions, order.outsideColor);
-  const pricing = getCakeTotal(order);
-
-  return [
-    "Cake order request",
-    `Order date: ${getLocalDateInputValue()}`,
-    `Event: ${event.label}`,
-    `Size: ${size.label} (${size.serves})`,
-    `Base price: $${pricing.basePrice}`,
-    `Flavor: ${flavor.label}`,
-    `Included filling: ${filling.label}`,
-    `Extra filling: ${extraFilling.value === "none" ? "No extra filling" : `${extraFilling.label} (+$10)`}`,
-    `Frosting: ${frosting.label}`,
-    `Outside color: ${outsideColor.label}`,
-    `Estimated total: $${pricing.total}`,
-    `Pickup date: ${order.pickupDate || "Choose a date"}`,
-    `Pickup time: ${formatPickupTime(order.pickupTime)}`,
-    `Cake message: ${order.inscription || "No inscription yet"}`,
-    `Customer: ${order.customerName || "Add your name"}`,
-    `Phone: ${order.phone || "Add a phone number"}`,
-    `Email: ${order.email || "Add an email"}`,
-    `Notes: ${order.notes || "No extra notes yet"}`,
-  ].join("\n");
-};
-
-const buildCupcakeOrderSummary = (order) => {
-  const flavor = findOption(cupcakeFlavorOptions, order.flavor);
-  const filling = findOption(cakeFillingOptions, order.filling);
-  const outsideColor = findOption(cakeColorOptions, order.outsideColor);
-  const pricing = getCupcakeTotal(order);
-
-  return [
-    "Custom cupcake order request",
-    `Order date: ${getLocalDateInputValue()}`,
-    `Quantity: ${pricing.quantity}`,
-    `Flavor: ${flavor.label}`,
-    `Price per cupcake: $${pricing.basePricePerCupcake.toFixed(2)}`,
-    `Filling: ${filling.value === "none" ? "No filling" : `${filling.label} (+$0.50 each)`}`,
-    `Cupcake color: ${outsideColor.label}`,
-    `Estimated total: $${pricing.total.toFixed(2)}`,
-    `Pickup date: ${order.pickupDate || "Choose a date"}`,
-    `Pickup time: ${formatPickupTime(order.pickupTime)}`,
-    `Customer: ${order.customerName || "Add your name"}`,
-    `Phone: ${order.phone || "Add a phone number"}`,
-    `Email: ${order.email || "Add an email"}`,
-    `Notes: ${order.notes || "No extra notes yet"}`,
-  ].join("\n");
 };
 
 const isCakeOrderPath = (pathname = "") =>
@@ -701,9 +654,16 @@ function HomePage() {
               <h3>{card.title}</h3>
               {card.detail ? <p className="highlight-card-detail">{card.detail}</p> : null}
               <p>{card.description}</p>
+              {card.actionLabel ? (
+                <a className="highlight-card-action" href={card.actionHref}>
+                  {card.actionLabel}
+                </a>
+              ) : null}
             </article>
           ))}
         </div>
+
+        <ReviewCarousel items={reviewHighlights} />
       </section>
 
       <section className="section-shell section-space" id="custom-cakes">
@@ -718,7 +678,7 @@ function HomePage() {
           </div>
 
           <aside className="gallery-note">
-            <p className="eyebrow">Order a cake</p>
+            <p className="gallery-note-title">Order a cake 🎂</p>
             <p>
               Choose your size, flavor, and pickup details on a separate custom
               order page built for cakes and cupcakes.
@@ -733,11 +693,25 @@ function HomePage() {
         </div>
 
         <PhotoGrid items={customCakePhotos} />
+
+        <aside className="gallery-note gallery-note-wide">
+          <p className="gallery-note-title">Order a cake 🎂</p>
+          <p>
+            See a cake style you love? Place your custom cake order now and
+            let Angie create something beautiful for your celebration.
+          </p>
+          <a className="text-link" href={cakeOrderHref}>
+            Start your cake order
+          </a>
+          <p className="gallery-note-support">
+            Prefer to order by phone? <a href={phoneHref}>(732) 515-9515</a>
+          </p>
+        </aside>
       </section>
 
       <section className="section-shell section-space" id="pastries">
         <div className="pastry-showcase">
-          <div className="section-heading">
+          <div className="section-heading compact-menu-heading">
             <p className="eyebrow">Pastries</p>
             <h2>Dessert happiness from the bakery case.</h2>
             <p>
@@ -755,7 +729,7 @@ function HomePage() {
           </figure>
         </div>
 
-        <div className="menu-grid">
+        <div className="menu-grid compact-menu-grid">
           {pastryMenus.map((menu) => (
             <MenuCard key={menu.title} {...menu} />
           ))}
@@ -770,15 +744,6 @@ function HomePage() {
       </section>
 
       <section className="section-shell section-space" id="menu">
-        <div className="section-heading">
-          <p className="eyebrow">Savory favorites</p>
-          <h2>Comfort food from the kitchen.</h2>
-          <p>
-            These savory plates and brunch favorites lead the menu first, so
-            the lunch and dinner section opens with the bakery's hearty food.
-          </p>
-        </div>
-
         <SavorySlideshow items={savoryFoodPhotos} />
 
         <div className="section-heading kitchen-heading">
@@ -787,7 +752,7 @@ function HomePage() {
           <p>
             Beyond the bakery counter, Angie's also serves hearty plates and
             all-day comfort food, with regular service Wednesday through
-            Monday from 11 AM to 7 PM, Sunday from 8 AM to 2 PM, and Tuesday
+            Monday from 11 AM to 7 PM, Sunday from 9 AM to 3 PM, and Tuesday
             closed.
           </p>
         </div>
@@ -811,9 +776,8 @@ function HomePage() {
             <p className="eyebrow">Fresh to order</p>
             <h2>Empanadas are made fresh for every order.</h2>
             <p>
-              The posted menu asks guests to allow at least a few minutes for
-              preparation, and every filling starts at an easy grab-and-go
-              price point.
+              Pick your favorite filling and enjoy a hot, crispy empanada made
+              fresh to order, perfect for a quick bite or a full box to share.
             </p>
             <p className="price-note">Add cheese for $0.50 more.</p>
           </article>
@@ -841,7 +805,7 @@ function HomePage() {
       </section>
 
       <section className="section-shell section-space" id="drinks">
-        <div className="section-heading">
+        <div className="section-heading compact-menu-heading">
           <p className="eyebrow">Drinks</p>
           <h2>From hot coffee to tropical fruit juice.</h2>
           <p>
@@ -850,7 +814,7 @@ function HomePage() {
           </p>
         </div>
 
-        <div className="menu-grid">
+        <div className="menu-grid compact-menu-grid">
           {drinkMenus.map((menu) => (
             <MenuCard key={menu.title} {...menu} />
           ))}
@@ -900,11 +864,11 @@ function CakeOrderPage() {
       <section className="section-shell section-space top-section">
         <div className="order-page-banner">
           <p className="eyebrow">Custom orders</p>
-          <h1>Choose custom cake or custom cupcakes in one place.</h1>
+          <h1>Order a custom cake or cupcakes made for your celebration.</h1>
           <p className="order-page-copy">
-            Start with cakes by default, or switch to custom cupcakes at the
-            top of the form. Each order type has its own fields, pickup
-            details, and summary so the checkout stays easy to follow.
+            Celebrate with a custom cake or cupcakes made to match your event,
+            your colors, and your favorite flavors, with simple pickup details
+            and secure checkout in one place.
           </p>
 
           <div className="hero-actions order-page-actions">
@@ -961,15 +925,6 @@ function CakeOrderPage() {
 
       <section className="section-shell section-space">
         <CustomOrderSection />
-      </section>
-
-      <section className="section-shell section-space">
-        <div className="service-note order-page-note">
-          <p>
-            Square checkout is now built into this page. After payment, your
-            confirmation screen appears here with the submitted order details.
-          </p>
-        </div>
       </section>
     </main>
   );
@@ -1095,25 +1050,8 @@ function CustomOrderSection() {
 
 function CakeOrderSection() {
   const [order, setOrder] = useState(defaultCakeOrder);
-  const [copied, setCopied] = useState(false);
   const orderDate = getLocalDateInputValue();
   const minPickupDate = getLocalDateInputValue(new Date(), 2);
-  const clipboardAvailable =
-    typeof navigator !== "undefined" && Boolean(navigator.clipboard);
-
-  useEffect(() => {
-    if (!copied) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setCopied(false);
-    }, 1800);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [copied]);
 
   const updateOrder = (event) => {
     const { name, value } = event.target;
@@ -1133,22 +1071,8 @@ function CakeOrderSection() {
   const extraFilling = findOption(cakeFillingOptions, order.extraFilling);
   const frosting = findOption(cakeFrostingOptions, order.frosting);
   const outsideColor = findOption(cakeColorOptions, order.outsideColor);
-  const summaryText = buildCakeOrderSummary(order);
   const pricing = getCakeTotal(order);
   const readyForPayment = isCakeOrderReadyForPayment(order);
-
-  const handleCopy = async () => {
-    if (!clipboardAvailable) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(summaryText);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
 
   return (
     <div className="cake-checkout-shell" role="tabpanel" aria-labelledby="custom-order-title">
@@ -1182,7 +1106,7 @@ function CakeOrderSection() {
           <article className="cake-step">
             <span>3</span>
             <strong>Review your order</strong>
-            <p>Check the summary before you confirm by phone.</p>
+            <p>Check the summary before you place order.</p>
           </article>
         </div>
 
@@ -1476,17 +1400,6 @@ function CakeOrderSection() {
             disabled={!readyForPayment}
             label={`Pay $${pricing.total.toFixed(2)} with Square`}
           />
-          <a className="text-link" href={phoneHref}>
-            Call to confirm this cake
-          </a>
-          <button
-            className="summary-copy-button"
-            type="button"
-            onClick={handleCopy}
-            disabled={!clipboardAvailable}
-          >
-            {copied ? "Copied order details" : "Copy order details"}
-          </button>
         </div>
       </aside>
     </div>
@@ -1495,25 +1408,8 @@ function CakeOrderSection() {
 
 function CupcakeOrderSection() {
   const [order, setOrder] = useState(defaultCupcakeOrder);
-  const [copied, setCopied] = useState(false);
   const orderDate = getLocalDateInputValue();
   const minPickupDate = getLocalDateInputValue(new Date(), 2);
-  const clipboardAvailable =
-    typeof navigator !== "undefined" && Boolean(navigator.clipboard);
-
-  useEffect(() => {
-    if (!copied) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setCopied(false);
-    }, 1800);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [copied]);
 
   const updateOrder = (event) => {
     const { name, value } = event.target;
@@ -1536,22 +1432,8 @@ function CupcakeOrderSection() {
   const flavor = findOption(cupcakeFlavorOptions, order.flavor);
   const filling = findOption(cakeFillingOptions, order.filling);
   const outsideColor = findOption(cakeColorOptions, order.outsideColor);
-  const summaryText = buildCupcakeOrderSummary(order);
   const pricing = getCupcakeTotal(order);
   const readyForPayment = isCupcakeOrderReadyForPayment(order);
-
-  const handleCopy = async () => {
-    if (!clipboardAvailable) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(summaryText);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
 
   return (
     <div className="cake-checkout-shell" role="tabpanel" aria-labelledby="custom-order-title">
@@ -1586,7 +1468,7 @@ function CupcakeOrderSection() {
           <article className="cake-step">
             <span>3</span>
             <strong>Review your request</strong>
-            <p>Confirm the details before Angie follows up with pricing.</p>
+            <p>Check the summary before you place order.</p>
           </article>
         </div>
 
@@ -1807,17 +1689,6 @@ function CupcakeOrderSection() {
             disabled={!readyForPayment}
             label={`Pay $${pricing.total.toFixed(2)} with Square`}
           />
-          <a className="text-link" href={phoneHref}>
-            Call to confirm these cupcakes
-          </a>
-          <button
-            className="summary-copy-button"
-            type="button"
-            onClick={handleCopy}
-            disabled={!clipboardAvailable}
-          >
-            {copied ? "Copied order details" : "Copy order details"}
-          </button>
         </div>
       </aside>
     </div>
@@ -1945,6 +1816,85 @@ function SavorySlideshow({ items }) {
             type="button"
             onClick={() => setActiveIndex(index)}
             aria-label={`Show savory food slide ${index + 1}`}
+            aria-pressed={index === activeIndex}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReviewCarousel({ items }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveIndex((index) => (index + 1) % items.length);
+    }, 5200);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [items.length]);
+
+  const activeItem = items[activeIndex];
+
+  const showPrevious = () => {
+    setActiveIndex((index) => (index - 1 + items.length) % items.length);
+  };
+
+  const showNext = () => {
+    setActiveIndex((index) => (index + 1) % items.length);
+  };
+
+  return (
+    <section className="review-carousel" aria-label="Customer review highlights">
+      <div className="review-carousel-frame">
+        <button
+          className="slideshow-control slideshow-control-prev"
+          type="button"
+          onClick={showPrevious}
+          aria-label="Show previous review highlight"
+        >
+          ‹
+        </button>
+
+        <article className="review-slide" key={activeItem.title}>
+          <p className="eyebrow">Google review highlights</p>
+          <div className="review-stars" aria-hidden="true">
+            <span>★★★★★</span>
+            <small>See what guests are saying</small>
+          </div>
+          <h3>{activeItem.title}</h3>
+          <p>{activeItem.text}</p>
+          <a
+            className="text-link"
+            href={googleReviewsHref}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Read reviews on Google
+          </a>
+        </article>
+
+        <button
+          className="slideshow-control slideshow-control-next"
+          type="button"
+          onClick={showNext}
+          aria-label="Show next review highlight"
+        >
+          ›
+        </button>
+      </div>
+
+      <div className="slideshow-dots" aria-label="Review highlight slides">
+        {items.map((item, index) => (
+          <button
+            key={item.title}
+            className={`slideshow-dot${index === activeIndex ? " is-active" : ""}`}
+            type="button"
+            onClick={() => setActiveIndex(index)}
+            aria-label={`Show review highlight ${index + 1}`}
             aria-pressed={index === activeIndex}
           />
         ))}
