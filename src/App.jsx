@@ -43,12 +43,12 @@ const businessHours = [
 
 const highlightCards = [
   {
-    kicker: "Celebrations",
-    title: "Custom cake orders",
+    kicker: "Explore the menu",
+    title: "Bakery favorites and comfort food",
     description:
-      "Birthday, baby shower, and themed cakes get a dedicated spotlight right on the homepage.",
-    actionLabel: "Order custom cake",
-    actionHref: cakeOrderHref,
+      "From tres leches and cupcakes to empanadas, coffee, and lunch plates, there is something worth stopping in for.",
+    actionLabel: "View menu",
+    actionHref: "#pastries",
   },
 ];
 

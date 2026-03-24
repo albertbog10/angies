@@ -413,7 +413,8 @@ h1 {
 
 .highlight-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(18rem, 34rem);
+  justify-content: center;
   gap: 1rem;
 }
 
@@ -427,6 +428,7 @@ h1 {
     linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 242, 247, 0.96));
   box-shadow: var(--shadow);
   overflow: hidden;
+  text-align: center;
 }
 
 .highlight-card::before {
@@ -471,6 +473,7 @@ h1 {
   align-items: center;
   justify-content: center;
   margin-top: 1rem;
+  margin-inline: auto;
   padding: 0.72rem 1.05rem;
   border-radius: 999px;
   background: linear-gradient(180deg, #f49fc2, #e36b9c);
