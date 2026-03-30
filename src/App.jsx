@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   businessPhotos,
   customCakePhotos,
@@ -30,6 +30,7 @@ const empanadaPhoto = empanadaPhotos[0];
 const customOrderCakePhoto = "/images/food/cake1.png";
 const customOrderCupcakePhoto = "/images/food/cupcake1.png";
 const checkoutReceiptStorageKey = "angies_last_checkout_order";
+const cakeImageFallbackSrc = "/images/food/cake1.png";
 
 const businessHours = [
   ["Tuesday", "Closed"],
@@ -251,7 +252,16 @@ const cakeColorOptions = [
   { value: "blue", label: "Blue" },
 ];
 
+const cakeProductOptions = [
+  { value: "cakept1", label: "cakept1", src: "/images/food/cakept1.jpeg" },
+  { value: "cakept2", label: "cakept2", src: "/images/food/cakept2.jpeg" },
+  { value: "cakept3", label: "cakept3", src: "/images/food/cakept3.jpeg" },
+  { value: "cakept4", label: "cakept4", src: "/images/food/cakept4.jpeg" },
+  { value: "cakept5", label: "cakept5", src: "/images/food/cakept5.jpeg" },
+];
+
 const defaultCakeOrder = {
+  productKey: "cakept1",
   eventType: "birthday",
   cakeSize: "8-inch",
   flavor: "yellow",
@@ -259,12 +269,7 @@ const defaultCakeOrder = {
   extraFilling: "none",
   frosting: "meringue",
   outsideColor: "white",
-  pickupDate: "",
-  pickupTime: "",
   inscription: "",
-  customerName: "",
-  phone: "",
-  email: "",
   notes: "",
 };
 
@@ -282,12 +287,15 @@ const defaultCupcakeOrder = {
   flavor: "yellow",
   filling: "none",
   outsideColor: "white",
+  notes: "",
+};
+
+const defaultCheckoutDetails = {
   pickupDate: "",
   pickupTime: "",
   customerName: "",
   phone: "",
   email: "",
-  notes: "",
 };
 
 const getLocalDateInputValue = (date = new Date(), offsetDays = 0) => {
@@ -299,6 +307,8 @@ const getLocalDateInputValue = (date = new Date(), offsetDays = 0) => {
 
 const findOption = (options, value) =>
   options.find((option) => option.value === value) ?? options[0];
+
+const getCakeProduct = (value) => findOption(cakeProductOptions, value);
 
 const getCakeTotal = (order) => {
   const size = findOption(cakeSizeOptions, order.cakeSize);
@@ -342,34 +352,83 @@ const formatPickupTime = (value) => {
 const isCakeOrderPath = (pathname = "") =>
   pathname === "/cake-order" || pathname.endsWith("/cake-order.html");
 
-const isCakeOrderReadyForPayment = (order) =>
-  Boolean(
-    order.pickupDate &&
-      order.pickupTime &&
-      order.customerName.trim() &&
-      order.phone.trim() &&
-      order.email.trim(),
-  );
-
-const isCupcakeOrderReadyForPayment = (order) =>
-  Boolean(
-    (Number(order.quantity) || 0) > 0 &&
-      order.pickupDate &&
-      order.pickupTime &&
-      order.customerName.trim() &&
-      order.phone.trim() &&
-      order.email.trim(),
-  );
-
-const buildCakePaymentPayload = (order) => ({
-  orderType: "cake",
-  order,
+const buildCartPaymentPayload = (items, checkout) => ({
+  orderType: "cart",
+  cart: {
+    items,
+    checkout,
+  },
 });
 
-const buildCupcakePaymentPayload = (order) => ({
-  orderType: "cupcake",
-  order,
-});
+const isCheckoutDetailsReady = (checkout) =>
+  Boolean(
+    checkout.pickupDate &&
+      checkout.pickupTime &&
+      checkout.customerName.trim() &&
+      checkout.phone.trim() &&
+      checkout.email.trim(),
+  );
+
+const isCartReadyForPayment = (items, checkout) =>
+  items.length > 0 && isCheckoutDetailsReady(checkout);
+
+const createCartItemId = () =>
+  `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getCartItemTitle = (item) => {
+  if (item.type === "cake") {
+    const product = getCakeProduct(item.order.productKey);
+    const size = findOption(cakeSizeOptions, item.order.cakeSize);
+    return `${product.label} ${size.label}`;
+  }
+
+  const pricing = getCupcakeTotal(item.order);
+  return `Custom cupcakes (${pricing.quantity})`;
+};
+
+const getCartItemPrice = (item) =>
+  item.type === "cake"
+    ? getCakeTotal(item.order).total
+    : getCupcakeTotal(item.order).total;
+
+const getCartTotal = (items) =>
+  items.reduce((sum, item) => sum + getCartItemPrice(item), 0);
+
+const getCartItemSummaryLines = (item) => {
+  if (item.type === "cake") {
+    const product = getCakeProduct(item.order.productKey);
+    const size = findOption(cakeSizeOptions, item.order.cakeSize);
+    const flavor = findOption(cakeFlavorOptions, item.order.flavor);
+    const filling = findOption(cakeFillingOptions, item.order.filling);
+    const extraFilling = findOption(cakeFillingOptions, item.order.extraFilling);
+    const frosting = findOption(cakeFrostingOptions, item.order.frosting);
+    const outsideColor = findOption(cakeColorOptions, item.order.outsideColor);
+
+    return [
+      `${product.label} · ${size.label} · ${flavor.label}`,
+      `Filling: ${filling.label}`,
+      `Extra filling: ${
+        extraFilling.value === "none" ? "None" : `${extraFilling.label} (+$10)`
+      }`,
+      `Frosting: ${frosting.label}`,
+      `Color: ${outsideColor.label}`,
+      `Message: ${item.order.inscription || "None"}`,
+    ];
+  }
+
+  const pricing = getCupcakeTotal(item.order);
+  const flavor = findOption(cupcakeFlavorOptions, item.order.flavor);
+  const filling = findOption(cakeFillingOptions, item.order.filling);
+  const outsideColor = findOption(cakeColorOptions, item.order.outsideColor);
+
+  return [
+    `${pricing.quantity} cupcakes · ${flavor.label}`,
+    `Filling: ${
+      filling.value === "none" ? "None" : `${filling.label} (+$0.50 each)`
+    }`,
+    `Color: ${outsideColor.label}`,
+  ];
+};
 
 const requestCheckoutLink = async (payload) => {
   const response = await fetch("/api/create-square-payment-link", {
@@ -407,7 +466,7 @@ const saveCheckoutReceipt = (payload) => {
   try {
     const snapshot = {
       orderType: payload.orderType,
-      order: payload.order,
+      order: payload.orderType === "cart" ? payload.cart : payload.order,
       submittedAt: new Date().toISOString(),
     };
     window.localStorage.setItem(checkoutReceiptStorageKey, JSON.stringify(snapshot));
@@ -430,7 +489,7 @@ const readCheckoutReceipt = () => {
     const parsedValue = JSON.parse(rawValue);
     const orderType = parsedValue?.orderType;
     const order = parsedValue?.order;
-    if (!order || (orderType !== "cake" && orderType !== "cupcake")) {
+    if (!order || !["cake", "cupcake", "cart"].includes(orderType)) {
       return null;
     }
 
@@ -464,6 +523,7 @@ const formatSubmittedAt = (submittedAt) => {
 };
 
 const buildCakeReceiptRows = (order, submittedAt) => {
+  const product = getCakeProduct(order.productKey);
   const size = findOption(cakeSizeOptions, order.cakeSize);
   const flavor = findOption(cakeFlavorOptions, order.flavor);
   const filling = findOption(cakeFillingOptions, order.filling);
@@ -480,6 +540,7 @@ const buildCakeReceiptRows = (order, submittedAt) => {
     ["Email", order.email || "Not provided"],
     ["Pickup date", order.pickupDate || "Not selected"],
     ["Pickup time", formatPickupTime(order.pickupTime)],
+    ["Product", product.label],
     ["Cake size", size.label],
     ["Flavor", flavor.label],
     ["Included filling", filling.label],
@@ -517,6 +578,29 @@ const buildCupcakeReceiptRows = (order, submittedAt) => {
     ["Cupcake color", outsideColor.label],
     ["Estimated paid total", `$${pricing.total.toFixed(2)}`],
   ];
+};
+
+const buildCartReceiptRows = (cart, submittedAt) => {
+  const rows = [
+    ["Order type", "Custom order cart"],
+    ["Submitted", formatSubmittedAt(submittedAt)],
+    ["Name", cart.checkout.customerName || "Not provided"],
+    ["Phone", cart.checkout.phone || "Not provided"],
+    ["Email", cart.checkout.email || "Not provided"],
+    ["Pickup date", cart.checkout.pickupDate || "Not selected"],
+    ["Pickup time", formatPickupTime(cart.checkout.pickupTime)],
+    ["Items in cart", String(cart.items.length)],
+    ["Estimated paid total", `$${getCartTotal(cart.items).toFixed(2)}`],
+  ];
+
+  cart.items.forEach((item, index) => {
+    rows.push([
+      `Item ${index + 1}`,
+      `${getCartItemTitle(item)} · ${getCartItemSummaryLines(item).join(" · ")}`,
+    ]);
+  });
+
+  return rows;
 };
 
 function App() {
@@ -680,11 +764,11 @@ function HomePage() {
           <aside className="gallery-note">
             <p className="gallery-note-title">Order a cake 🎂</p>
             <p>
-              Choose your size, flavor, and pickup details on a separate custom
-              order page built for cakes and cupcakes.
+              Choose your size, flavor, pickup details, and more on a separate
+              order page built for cakes, cupcakes, and cart checkout.
             </p>
             <a className="text-link" href={cakeOrderHref}>
-              Start your cake order
+              Start your order
             </a>
             <p className="gallery-note-support">
               Prefer to order by phone? <a href={phoneHref}>(732) 515-9515</a>
@@ -697,11 +781,11 @@ function HomePage() {
         <aside className="gallery-note gallery-note-wide">
           <p className="gallery-note-title">Order a cake 🎂</p>
           <p>
-            See a cake style you love? Place your custom cake order now and
+            See a cake style you love? Build your order, add your details, and
             let Angie create something beautiful for your celebration.
           </p>
           <a className="text-link" href={cakeOrderHref}>
-            Start your cake order
+            Start your order
           </a>
           <p className="gallery-note-support">
             Prefer to order by phone? <a href={phoneHref}>(732) 515-9515</a>
@@ -845,13 +929,26 @@ function CakeOrderPage() {
 
   const completedOrderType =
     checkoutReceipt?.orderType ||
-    (orderTypeFromQuery === "cupcake" ? "cupcake" : "cake");
+    (orderTypeFromQuery === "cupcake"
+      ? "cupcake"
+      : orderTypeFromQuery === "cart"
+        ? "cart"
+        : "cake");
   const receiptRows = checkoutReceipt
     ? completedOrderType === "cupcake"
       ? buildCupcakeReceiptRows(checkoutReceipt.order, checkoutReceipt.submittedAt)
-      : buildCakeReceiptRows(checkoutReceipt.order, checkoutReceipt.submittedAt)
+      : completedOrderType === "cart"
+        ? buildCartReceiptRows(checkoutReceipt.order, checkoutReceipt.submittedAt)
+        : buildCakeReceiptRows(checkoutReceipt.order, checkoutReceipt.submittedAt)
     : [
-        ["Order type", completedOrderType === "cupcake" ? "Custom cupcakes" : "Custom cake"],
+        [
+          "Order type",
+          completedOrderType === "cupcake"
+            ? "Custom cupcakes"
+            : completedOrderType === "cart"
+              ? "Custom order cart"
+              : "Custom cake",
+        ],
         ["Status", "Paid"],
         [
           "Order details",
@@ -864,11 +961,11 @@ function CakeOrderPage() {
       <section className="section-shell section-space top-section">
         <div className="order-page-banner">
           <p className="eyebrow">Custom orders</p>
-          <h1>Order a custom cake or cupcakes made for your celebration.</h1>
+          <h1>Build your order cart for cakes, cupcakes, and more.</h1>
           <p className="order-page-copy">
-            Celebrate with a custom cake or cupcakes made to match your event,
-            your colors, and your favorite flavors, with simple pickup details
-            and secure checkout in one place.
+            Start with cakes and cupcakes in one cart, keep every item
+            customizable, and finish with one secure checkout when your order
+            looks right.
           </p>
 
           <div className="hero-actions order-page-actions">
@@ -876,7 +973,7 @@ function CakeOrderPage() {
               className="hero-button hero-button-primary"
               href={`${cakeOrderHref}?type=cake#cake-order`}
             >
-              Custom Cake
+              Start your order
             </a>
             <a
               className="hero-button hero-button-secondary"
@@ -896,7 +993,9 @@ function CakeOrderPage() {
           <div className="service-note order-status-note post-checkout-note">
             <p className="eyebrow">Order confirmed</p>
             <h2>
-              {completedOrderType === "cupcake"
+              {completedOrderType === "cart"
+                ? "Thanks for your custom order."
+                : completedOrderType === "cupcake"
                 ? "Thanks for your cupcake order."
                 : "Thanks for your cake order."}
             </h2>
@@ -1011,6 +1110,7 @@ function MenuCard({ title, items, accent = false, noteLabel, note }) {
 }
 
 function CustomOrderSection() {
+  const checkoutPanelRef = useRef(null);
   const [orderType, setOrderType] = useState(() => {
     if (typeof window === "undefined") {
       return "cake";
@@ -1019,6 +1119,109 @@ function CustomOrderSection() {
     const type = new URLSearchParams(window.location.search).get("type");
     return type === "cupcake" ? "cupcake" : "cake";
   });
+  const [cakeOrder, setCakeOrder] = useState(defaultCakeOrder);
+  const [cupcakeOrder, setCupcakeOrder] = useState(defaultCupcakeOrder);
+  const [checkoutDetails, setCheckoutDetails] = useState(defaultCheckoutDetails);
+  const [cartItems, setCartItems] = useState([]);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const minPickupDate = getLocalDateInputValue(new Date(), 2);
+
+  const editingItem = cartItems.find((item) => item.id === editingItemId) || null;
+  const checkoutPanelId = "order-checkout-panel";
+
+  const selectOrderType = (nextType) => {
+    setOrderType(nextType);
+    if (editingItem && editingItem.type !== nextType) {
+      setEditingItemId(null);
+    }
+  };
+
+  const updateCheckoutDetails = (event) => {
+    const { name, value } = event.target;
+    const nextValue =
+      name === "pickupDate" && value && value < minPickupDate ? minPickupDate : value;
+
+    setCheckoutDetails((current) => ({
+      ...current,
+      [name]: nextValue,
+    }));
+  };
+
+  const scrollToCheckout = () => {
+    const panel =
+      checkoutPanelRef.current ||
+      (typeof document !== "undefined"
+        ? document.getElementById(checkoutPanelId)
+        : null);
+
+    panel?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const saveCartItem = (type, order) => {
+    const nextItem = {
+      id: editingItem && editingItem.type === type ? editingItem.id : createCartItemId(),
+      type,
+      order: { ...order },
+    };
+
+    setCartItems((current) => {
+      if (editingItem && editingItem.type === type) {
+        return current.map((item) => (item.id === editingItem.id ? nextItem : item));
+      }
+
+      return [...current, nextItem];
+    });
+
+    if (type === "cake") {
+      setCakeOrder({ ...defaultCakeOrder });
+    } else {
+      setCupcakeOrder({ ...defaultCupcakeOrder });
+    }
+
+    setEditingItemId(null);
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        scrollToCheckout();
+      }, 120);
+    }
+  };
+
+  const startEditingItem = (item) => {
+    setOrderType(item.type);
+    setEditingItemId(item.id);
+
+    if (item.type === "cake") {
+      setCakeOrder({ ...item.order });
+      return;
+    }
+
+    setCupcakeOrder({ ...item.order });
+  };
+
+  const cancelEditingItem = () => {
+    if (editingItem?.type === "cake") {
+      setCakeOrder({ ...defaultCakeOrder });
+    } else if (editingItem?.type === "cupcake") {
+      setCupcakeOrder({ ...defaultCupcakeOrder });
+    }
+
+    setEditingItemId(null);
+  };
+
+  const removeCartItem = (itemId) => {
+    setCartItems((current) => current.filter((item) => item.id !== itemId));
+    if (editingItemId === itemId) {
+      setEditingItemId(null);
+    }
+  };
+
+  const cartPayload = buildCartPaymentPayload(cartItems, checkoutDetails);
+  const cartReadyForPayment = isCartReadyForPayment(cartItems, checkoutDetails);
+  const cartTotal = getCartTotal(cartItems);
 
   return (
     <section className="cake-checkout" id="cake-order" aria-labelledby="custom-order-title">
@@ -1028,7 +1231,7 @@ function CustomOrderSection() {
           type="button"
           role="tab"
           aria-selected={orderType === "cake"}
-          onClick={() => setOrderType("cake")}
+          onClick={() => selectOrderType("cake")}
         >
           Custom Cake
         </button>
@@ -1037,34 +1240,78 @@ function CustomOrderSection() {
           type="button"
           role="tab"
           aria-selected={orderType === "cupcake"}
-          onClick={() => setOrderType("cupcake")}
+          onClick={() => selectOrderType("cupcake")}
         >
           Custom Cupcakes
         </button>
       </div>
 
-      {orderType === "cake" ? <CakeOrderSection /> : <CupcakeOrderSection />}
+      {cartItems.length ? (
+        <div className="checkout-helper-bar" aria-label="Cart progress">
+          <div className="checkout-helper-copy">
+            <strong>
+              {cartItems.length} {cartItems.length === 1 ? "item" : "items"} in cart
+            </strong>
+            <span>${cartTotal.toFixed(2)} total</span>
+          </div>
+          <button
+            className="hero-button hero-button-primary checkout-helper-button"
+            type="button"
+            onClick={scrollToCheckout}
+          >
+            Go to checkout
+          </button>
+        </div>
+      ) : null}
+
+      <div className="cake-checkout-shell">
+        {orderType === "cake" ? (
+          <CakeProductBuilder
+            order={cakeOrder}
+            setOrder={setCakeOrder}
+            onSave={(order) => saveCartItem("cake", order)}
+            isEditing={editingItem?.type === "cake"}
+            onCancelEdit={cancelEditingItem}
+          />
+        ) : (
+          <CupcakeProductBuilder
+            order={cupcakeOrder}
+            setOrder={setCupcakeOrder}
+            onSave={(order) => saveCartItem("cupcake", order)}
+            isEditing={editingItem?.type === "cupcake"}
+            onCancelEdit={cancelEditingItem}
+          />
+        )}
+
+        <CartCheckoutPanel
+          panelId={checkoutPanelId}
+          panelRef={checkoutPanelRef}
+          cartItems={cartItems}
+          checkoutDetails={checkoutDetails}
+          updateCheckoutDetails={updateCheckoutDetails}
+          minPickupDate={minPickupDate}
+          onEditItem={startEditingItem}
+          onRemoveItem={removeCartItem}
+          payload={cartPayload}
+          readyForPayment={cartReadyForPayment}
+          cartTotal={cartTotal}
+        />
+      </div>
     </section>
   );
 }
 
-function CakeOrderSection() {
-  const [order, setOrder] = useState(defaultCakeOrder);
-  const orderDate = getLocalDateInputValue();
-  const minPickupDate = getLocalDateInputValue(new Date(), 2);
-
+function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }) {
   const updateOrder = (event) => {
     const { name, value } = event.target;
-    const nextValue =
-      name === "pickupDate" && value && value < minPickupDate ? minPickupDate : value;
-
     setOrder((current) => ({
       ...current,
-      [name]: nextValue,
+      [name]: value,
     }));
   };
 
-  const event = findOption(cakeEventOptions, order.eventType);
+  const selectedProduct = getCakeProduct(order.productKey);
+  const eventType = findOption(cakeEventOptions, order.eventType);
   const size = findOption(cakeSizeOptions, order.cakeSize);
   const flavor = findOption(cakeFlavorOptions, order.flavor);
   const filling = findOption(cakeFillingOptions, order.filling);
@@ -1072,360 +1319,272 @@ function CakeOrderSection() {
   const frosting = findOption(cakeFrostingOptions, order.frosting);
   const outsideColor = findOption(cakeColorOptions, order.outsideColor);
   const pricing = getCakeTotal(order);
-  const readyForPayment = isCakeOrderReadyForPayment(order);
 
   return (
-    <div className="cake-checkout-shell" role="tabpanel" aria-labelledby="custom-order-title">
-      <article className="cake-builder-card">
-        <p className="eyebrow">Custom cake</p>
-        <figure className="order-form-photo-card">
-          <img
-            loading="lazy"
-            src={customOrderCakePhoto}
-            alt="White birthday cake with Happy Birthday written on top"
-          />
-        </figure>
-        <h3 id="custom-order-title">Start your custom cake checkout.</h3>
-        <p className="cake-builder-copy">
-          Choose your cake details, enter your pickup information, and review
-          everything in one place before you confirm the order. Cake orders
-          must be placed at least two days in advance.
-        </p>
-
-        <div className="cake-step-strip" aria-label="Cake ordering steps">
-          <article className="cake-step">
-            <span>1</span>
-            <strong>Choose your cake</strong>
-            <p>Pick the size, flavor, filling, and colors.</p>
-          </article>
-          <article className="cake-step">
-            <span>2</span>
-            <strong>Add pickup details</strong>
-            <p>Tell Angie when you need it and what to write on top.</p>
-          </article>
-          <article className="cake-step">
-            <span>3</span>
-            <strong>Review your order</strong>
-            <p>Check the summary before you place order.</p>
-          </article>
+    <article className="cake-builder-card" role="tabpanel" aria-labelledby="custom-order-title">
+      <p className="eyebrow">Custom cake</p>
+      <div className="cake-product-picker-shell">
+        <div className="cake-product-picker-copy">
+          <h4>Choose a cake style</h4>
+          <p>Pick a cake below to start customizing it.</p>
         </div>
+        <div className="cake-product-picker" aria-label="Choose a cake product">
+        {cakeProductOptions.map((product) => (
+          <button
+            key={product.value}
+            className={`cake-product-option${
+              order.productKey === product.value ? " is-active" : ""
+            }`}
+            type="button"
+            onClick={() =>
+              setOrder((current) => ({
+                ...current,
+                productKey: product.value,
+              }))
+            }
+          >
+            <img
+              loading="lazy"
+              src={product.src}
+              alt={product.label}
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = cakeImageFallbackSrc;
+              }}
+            />
+            <span className="cake-product-option-name">{product.label}</span>
+            <span className="cake-product-option-cta">
+              {order.productKey === product.value ? "Selected" : "Select cake"}
+            </span>
+          </button>
+        ))}
+        </div>
+      </div>
+      <figure className="order-form-photo-card">
+        <img
+          loading="lazy"
+          src={selectedProduct.src}
+          alt={selectedProduct.label}
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = cakeImageFallbackSrc;
+          }}
+        />
+      </figure>
+      <h3 id="custom-order-title">Build your custom cake.</h3>
+      <p className="cake-builder-copy">
+        Choose the {selectedProduct.label} details you want, then add it to your
+        order cart before checkout.
+      </p>
 
-        <form
-          className="cake-order-form"
-          onSubmit={(event) => event.preventDefault()}
-        >
-          <div className="form-grid">
-            <label className="form-field">
-              <span>Occasion</span>
-              <select name="eventType" value={order.eventType} onChange={updateOrder}>
-                {cakeEventOptions.map((option) => (
+      <div className="cake-step-strip" aria-label="Cake ordering steps">
+        <article className="cake-step">
+          <span>1</span>
+          <strong>Customize</strong>
+          <p>Choose size, flavor, filling, frosting, colors, and message.</p>
+        </article>
+        <article className="cake-step">
+          <span>2</span>
+          <strong>Add to cart</strong>
+          <p>Save the cake as one item in your order.</p>
+        </article>
+        <article className="cake-step">
+          <span>3</span>
+          <strong>Checkout once</strong>
+          <p>Finish the whole cart in a single Square payment.</p>
+        </article>
+      </div>
+
+      <form className="cake-order-form" onSubmit={(event) => event.preventDefault()}>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>Occasion</span>
+            <select name="eventType" value={order.eventType} onChange={updateOrder}>
+              {cakeEventOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Cake size</span>
+            <select name="cakeSize" value={order.cakeSize} onChange={updateOrder}>
+              {cakeSizeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>{size.serves} · Base price ${size.price}</small>
+          </label>
+
+          <label className="form-field">
+            <span>Cake flavor</span>
+            <select name="flavor" value={order.flavor} onChange={updateOrder}>
+              {cakeFlavorOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Frosting</span>
+            <select name="frosting" value={order.frosting} onChange={updateOrder}>
+              {cakeFrostingOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Included filling</span>
+            <select name="filling" value={order.filling} onChange={updateOrder}>
+              {cakeFillingOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>One filling is included.</small>
+          </label>
+
+          <label className="form-field">
+            <span>Extra filling</span>
+            <select name="extraFilling" value={order.extraFilling} onChange={updateOrder}>
+              <option value="none">No extra filling</option>
+              {cakeFillingOptions
+                .filter((option) => option.value !== "none")
+                .map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
-              </select>
-            </label>
+            </select>
+            <small>Add a second filling for $10 more.</small>
+          </label>
 
-              <label className="form-field">
-                <span>Cake size</span>
-                <select name="cakeSize" value={order.cakeSize} onChange={updateOrder}>
-                  {cakeSizeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <small>{size.serves} · Base price ${size.price}</small>
-              </label>
+          <label className="form-field form-field-full">
+            <span>Outside cake color</span>
+            <select name="outsideColor" value={order.outsideColor} onChange={updateOrder}>
+              {cakeColorOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>Choose from blue, green, yellow, pink, white, or gold.</small>
+          </label>
 
-              <label className="form-field">
-                <span>Cake flavor</span>
-                <select name="flavor" value={order.flavor} onChange={updateOrder}>
-                  {cakeFlavorOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <label className="form-field form-field-full">
+            <span>Message on cake</span>
+            <input
+              name="inscription"
+              placeholder="Happy Birthday Maria"
+              type="text"
+              value={order.inscription}
+              onChange={updateOrder}
+            />
+          </label>
 
-              <label className="form-field">
-                <span>Frosting</span>
-                <select name="frosting" value={order.frosting} onChange={updateOrder}>
-                  {cakeFrostingOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>Included filling</span>
-                <select name="filling" value={order.filling} onChange={updateOrder}>
-                  {cakeFillingOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <small>One filling is included.</small>
-              </label>
-
-              <label className="form-field">
-                <span>Extra filling</span>
-                <select
-                  name="extraFilling"
-                  value={order.extraFilling}
-                  onChange={updateOrder}
-                >
-                  <option value="none">No extra filling</option>
-                  {cakeFillingOptions
-                    .filter((option) => option.value !== "none")
-                    .map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                </select>
-                <small>Add a second filling for $10 more.</small>
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>Outside cake color</span>
-                <select
-                  name="outsideColor"
-                  value={order.outsideColor}
-                  onChange={updateOrder}
-                >
-                  {cakeColorOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <small>Choose from blue, green, yellow, pink, white, or gold.</small>
-              </label>
-
-              <label className="form-field">
-                <span>Pickup date</span>
-                <input
-                  min={minPickupDate}
-                  name="pickupDate"
-                  type="date"
-                  value={order.pickupDate}
-                  onChange={updateOrder}
-                />
-                <small>Minimum 2 days notice required.</small>
-              </label>
-
-              <label className="form-field">
-                <span>Pickup time</span>
-                <input
-                  name="pickupTime"
-                  type="time"
-                  value={order.pickupTime}
-                  onChange={updateOrder}
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>Message on cake</span>
-                <input
-                  name="inscription"
-                  placeholder="Happy Birthday Maria"
-                  type="text"
-                  value={order.inscription}
-                  onChange={updateOrder}
-                />
-              </label>
-
-              <label className="form-field">
-                <span>Your name</span>
-                <input
-                  name="customerName"
-                  placeholder="Full name"
-                  type="text"
-                  value={order.customerName}
-                  onChange={updateOrder}
-                />
-              </label>
-
-              <label className="form-field">
-                <span>Phone number</span>
-                <input
-                  name="phone"
-                  placeholder="(732) 555-1234"
-                  type="tel"
-                  value={order.phone}
-                  onChange={updateOrder}
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>Email</span>
-                <input
-                  name="email"
-                  placeholder="name@email.com"
-                  type="email"
-                  value={order.email}
-                  onChange={updateOrder}
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>Design notes</span>
-                <textarea
-                  name="notes"
-                  placeholder="Theme, writing request, or any special instruction."
-                  rows="4"
-                  value={order.notes}
-                  onChange={updateOrder}
-                />
-              </label>
-          </div>
-        </form>
-      </article>
-
-      <aside className="cake-summary-card">
-        <p className="eyebrow">Order summary</p>
-        <h3>Your cake request</h3>
-
-          <section className="cake-summary-group" aria-label="Cake details">
-            <h4>Cake</h4>
-            <dl>
-              <div>
-                <dt>Order date</dt>
-                <dd>{orderDate}</dd>
-              </div>
-              <div>
-                <dt>Occasion</dt>
-                <dd>{event.label}</dd>
-              </div>
-              <div>
-                <dt>Size</dt>
-                <dd>{size.label}</dd>
-              </div>
-              <div>
-                <dt>Serving guide</dt>
-                <dd>{size.serves}</dd>
-              </div>
-              <div>
-                <dt>Base price</dt>
-                <dd>${pricing.basePrice}</dd>
-              </div>
-              <div>
-                <dt>Flavor</dt>
-                <dd>{flavor.label}</dd>
-              </div>
-              <div>
-                <dt>Frosting</dt>
-                <dd>{frosting.label}</dd>
-              </div>
-              <div>
-                <dt>Included filling</dt>
-                <dd>{filling.label}</dd>
-              </div>
-              <div>
-                <dt>Extra filling</dt>
-                <dd>
-                  {extraFilling.value === "none"
-                    ? "No extra filling"
-                    : `${extraFilling.label} (+$10)`}
-                </dd>
-              </div>
-              <div>
-                <dt>Outside color</dt>
-                <dd>{outsideColor.label}</dd>
-              </div>
-              <div>
-                <dt>Estimated total</dt>
-                <dd>${pricing.total}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="cake-summary-group" aria-label="Pickup details">
-            <h4>Pickup</h4>
-            <dl>
-              <div>
-                <dt>Date</dt>
-                <dd>{order.pickupDate || "Choose a pickup date"}</dd>
-              </div>
-              <div>
-                <dt>Time</dt>
-                <dd>{formatPickupTime(order.pickupTime)}</dd>
-              </div>
-              <div>
-                <dt>Message</dt>
-                <dd>{order.inscription || "No cake message yet"}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="cake-summary-group" aria-label="Contact information">
-            <h4>Contact</h4>
-            <dl>
-              <div>
-                <dt>Name</dt>
-                <dd>{order.customerName || "Add your name"}</dd>
-              </div>
-              <div>
-                <dt>Phone</dt>
-                <dd>{order.phone || "Add a phone number"}</dd>
-              </div>
-              <div>
-                <dt>Email</dt>
-                <dd>{order.email || "Add an email"}</dd>
-              </div>
-            </dl>
-          </section>
-
-        <div className="cake-summary-note">
-          <p>
-            Full payment is collected through Square at checkout. Cake orders
-            still need at least two days notice and remain subject to
-            availability review.
-          </p>
-          <p>
-            Cake sizes are 6&quot; for $65, 8&quot; for $75, and 10&quot; for $85.
-            One filling is included, and an extra filling adds $10.
-            </p>
-            <p>{order.notes || "Add notes if you have a theme, writing request, or other special instruction."}</p>
-          </div>
-
-        <div className="cake-summary-actions">
-          <SquareCheckoutButton
-            payload={buildCakePaymentPayload(order)}
-            disabled={!readyForPayment}
-            label={`Pay $${pricing.total.toFixed(2)} with Square`}
-          />
+          <label className="form-field form-field-full">
+            <span>Design notes</span>
+            <textarea
+              name="notes"
+              placeholder="Theme, writing request, or any special instruction."
+              rows="4"
+              value={order.notes}
+              onChange={updateOrder}
+            />
+          </label>
         </div>
-      </aside>
-    </div>
+      </form>
+
+      <section className="cake-summary-group builder-preview-group" aria-label="Cake preview">
+        <h4>Item preview</h4>
+        <dl>
+          <div>
+            <dt>Product</dt>
+            <dd>{selectedProduct.label}</dd>
+          </div>
+          <div>
+            <dt>Occasion</dt>
+            <dd>{eventType.label}</dd>
+          </div>
+          <div>
+            <dt>Size</dt>
+            <dd>{size.label}</dd>
+          </div>
+          <div>
+            <dt>Flavor</dt>
+            <dd>{flavor.label}</dd>
+          </div>
+          <div>
+            <dt>Filling</dt>
+            <dd>{filling.label}</dd>
+          </div>
+          <div>
+            <dt>Extra filling</dt>
+            <dd>
+              {extraFilling.value === "none"
+                ? "No extra filling"
+                : `${extraFilling.label} (+$10)`}
+            </dd>
+          </div>
+          <div>
+            <dt>Frosting</dt>
+            <dd>{frosting.label}</dd>
+          </div>
+          <div>
+            <dt>Color</dt>
+            <dd>{outsideColor.label}</dd>
+          </div>
+          <div>
+            <dt>Item subtotal</dt>
+            <dd>${pricing.total.toFixed(2)}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <div className="cake-summary-note">
+        <p>Cake sizes are 6&quot; for $65, 8&quot; for $75, and 10&quot; for $85.</p>
+        <p>One filling is included, and an extra filling adds $10.</p>
+        <p>{order.notes || "Add notes if you have a theme, writing request, or other special instruction."}</p>
+      </div>
+
+      <div className="cake-summary-actions">
+        <button
+          className="hero-button hero-button-primary payment-button"
+          type="button"
+          onClick={() => onSave(order)}
+        >
+          {isEditing ? "Update cake in cart" : "Add cake to cart"}
+        </button>
+        {isEditing ? (
+          <button
+            className="hero-button hero-button-secondary payment-button"
+            type="button"
+            onClick={onCancelEdit}
+          >
+            Cancel edit
+          </button>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
-function CupcakeOrderSection() {
-  const [order, setOrder] = useState(defaultCupcakeOrder);
-  const orderDate = getLocalDateInputValue();
-  const minPickupDate = getLocalDateInputValue(new Date(), 2);
-
+function CupcakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }) {
   const updateOrder = (event) => {
     const { name, value } = event.target;
-    let nextValue = value;
-
-    if (name === "pickupDate" && value && value < minPickupDate) {
-      nextValue = minPickupDate;
-    }
-
-    if (name === "quantity") {
-      nextValue = value.replace(/[^\d]/g, "");
-    }
-
     setOrder((current) => ({
       ...current,
-      [name]: nextValue,
+      [name]: name === "quantity" ? value.replace(/[^\d]/g, "") : value,
     }));
   };
 
@@ -1433,265 +1592,305 @@ function CupcakeOrderSection() {
   const filling = findOption(cakeFillingOptions, order.filling);
   const outsideColor = findOption(cakeColorOptions, order.outsideColor);
   const pricing = getCupcakeTotal(order);
-  const readyForPayment = isCupcakeOrderReadyForPayment(order);
 
   return (
-    <div className="cake-checkout-shell" role="tabpanel" aria-labelledby="custom-order-title">
-      <article className="cake-builder-card">
-        <p className="eyebrow">Custom cupcakes</p>
-        <figure className="order-form-photo-card">
-          <img
-            loading="lazy"
-            src={customOrderCupcakePhoto}
-            alt="Vanilla cupcakes with swirled frosting on a marble surface"
-          />
-        </figure>
-        <h3 id="custom-order-title">Start your custom cupcake order.</h3>
-        <p className="cake-builder-copy">
-          Choose the cupcake quantity, flavor, filling, and pickup details in
-          one simple flow. Cupcakes are $3.50 each, and filling is $0.50 more
-          per cupcake. Custom cupcake orders also need at least two days
-          notice.
-        </p>
+    <article className="cake-builder-card" role="tabpanel" aria-labelledby="custom-order-title">
+      <p className="eyebrow">Custom cupcakes</p>
+      <figure className="order-form-photo-card">
+        <img
+          loading="lazy"
+          src={customOrderCupcakePhoto}
+          alt="Vanilla cupcakes with swirled frosting on a marble surface"
+        />
+      </figure>
+      <h3 id="custom-order-title">Build your custom cupcakes.</h3>
+      <p className="cake-builder-copy">
+        Customize your cupcakes here, then keep them in the same order cart as
+        your other products before checkout.
+      </p>
 
-        <div className="cake-step-strip" aria-label="Cupcake ordering steps">
-          <article className="cake-step">
-            <span>1</span>
-            <strong>Choose your cupcakes</strong>
-            <p>Pick the quantity, flavor, filling, and cupcake color.</p>
-          </article>
-          <article className="cake-step">
-            <span>2</span>
-            <strong>Add pickup details</strong>
-            <p>Choose the pickup date and time for your order.</p>
-          </article>
-          <article className="cake-step">
-            <span>3</span>
-            <strong>Review your request</strong>
-            <p>Check the summary before you place order.</p>
-          </article>
+      <div className="cake-step-strip" aria-label="Cupcake ordering steps">
+        <article className="cake-step">
+          <span>1</span>
+          <strong>Customize</strong>
+          <p>Choose quantity, flavor, filling, and cupcake color.</p>
+        </article>
+        <article className="cake-step">
+          <span>2</span>
+          <strong>Add to cart</strong>
+          <p>Save the cupcakes as one item in your order.</p>
+        </article>
+        <article className="cake-step">
+          <span>3</span>
+          <strong>Checkout once</strong>
+          <p>Pay for the whole sample cart in one place.</p>
+        </article>
+      </div>
+
+      <form className="cake-order-form" onSubmit={(event) => event.preventDefault()}>
+        <div className="form-grid">
+          <label className="form-field">
+            <span>Quantity</span>
+            <input
+              min="1"
+              name="quantity"
+              placeholder="12"
+              type="number"
+              value={order.quantity}
+              onChange={updateOrder}
+            />
+            <small>$3.50 per cupcake.</small>
+          </label>
+
+          <label className="form-field">
+            <span>Cupcake flavor</span>
+            <select name="flavor" value={order.flavor} onChange={updateOrder}>
+              {cupcakeFlavorOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Filling</span>
+            <select name="filling" value={order.filling} onChange={updateOrder}>
+              {cakeFillingOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>One filling choice applies to every cupcake. Add $0.50 each.</small>
+          </label>
+
+          <label className="form-field form-field-full">
+            <span>Cupcake color</span>
+            <select name="outsideColor" value={order.outsideColor} onChange={updateOrder}>
+              {cakeColorOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>Choose from blue, green, yellow, pink, white, or gold.</small>
+          </label>
+
+          <label className="form-field form-field-full">
+            <span>Design notes</span>
+            <textarea
+              name="notes"
+              placeholder="Theme, topper ideas, color placement, or other special instruction."
+              rows="4"
+              value={order.notes}
+              onChange={updateOrder}
+            />
+          </label>
         </div>
+      </form>
 
-        <form
-          className="cake-order-form"
-          onSubmit={(event) => event.preventDefault()}
-        >
-          <div className="form-grid">
-            <label className="form-field">
-              <span>Quantity</span>
-              <input
-                min="1"
-                name="quantity"
-                placeholder="12"
-                type="number"
-                value={order.quantity}
-                onChange={updateOrder}
-              />
-              <small>$3.50 per cupcake.</small>
-            </label>
-
-            <label className="form-field">
-              <span>Cupcake flavor</span>
-              <select name="flavor" value={order.flavor} onChange={updateOrder}>
-                {cupcakeFlavorOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>Filling</span>
-              <select name="filling" value={order.filling} onChange={updateOrder}>
-                {cakeFillingOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <small>One filling choice applies to every cupcake. Add $0.50 each.</small>
-            </label>
-
-            <label className="form-field form-field-full">
-              <span>Cupcake color</span>
-              <select
-                name="outsideColor"
-                value={order.outsideColor}
-                onChange={updateOrder}
-              >
-                {cakeColorOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <small>Choose from blue, green, yellow, pink, white, or gold.</small>
-            </label>
-
-            <label className="form-field">
-              <span>Pickup date</span>
-              <input
-                min={minPickupDate}
-                name="pickupDate"
-                type="date"
-                value={order.pickupDate}
-                onChange={updateOrder}
-              />
-              <small>Minimum 2 days notice required.</small>
-            </label>
-
-            <label className="form-field">
-              <span>Pickup time</span>
-              <input
-                name="pickupTime"
-                type="time"
-                value={order.pickupTime}
-                onChange={updateOrder}
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Your name</span>
-              <input
-                name="customerName"
-                placeholder="Full name"
-                type="text"
-                value={order.customerName}
-                onChange={updateOrder}
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Phone number</span>
-              <input
-                name="phone"
-                placeholder="(732) 555-1234"
-                type="tel"
-                value={order.phone}
-                onChange={updateOrder}
-              />
-            </label>
-
-            <label className="form-field form-field-full">
-              <span>Email</span>
-              <input
-                name="email"
-                placeholder="name@email.com"
-                type="email"
-                value={order.email}
-                onChange={updateOrder}
-              />
-            </label>
-
-            <label className="form-field form-field-full">
-              <span>Design notes</span>
-              <textarea
-                name="notes"
-                placeholder="Theme, topper ideas, color placement, or other special instruction."
-                rows="4"
-                value={order.notes}
-                onChange={updateOrder}
-              />
-            </label>
+      <section className="cake-summary-group builder-preview-group" aria-label="Cupcake preview">
+        <h4>Item preview</h4>
+        <dl>
+          <div>
+            <dt>Quantity</dt>
+            <dd>{pricing.quantity}</dd>
           </div>
-        </form>
-      </article>
+          <div>
+            <dt>Flavor</dt>
+            <dd>{flavor.label}</dd>
+          </div>
+          <div>
+            <dt>Filling</dt>
+            <dd>
+              {filling.value === "none" ? "No filling" : `${filling.label} (+$0.50 each)`}
+            </dd>
+          </div>
+          <div>
+            <dt>Color</dt>
+            <dd>{outsideColor.label}</dd>
+          </div>
+          <div>
+            <dt>Item subtotal</dt>
+            <dd>${pricing.total.toFixed(2)}</dd>
+          </div>
+        </dl>
+      </section>
 
-      <aside className="cake-summary-card">
-        <p className="eyebrow">Order summary</p>
-        <h3>Your cupcake request</h3>
+      <div className="cake-summary-note">
+        <p>Cupcakes are $3.50 each no matter the amount.</p>
+        <p>If you add filling, it applies to every cupcake and adds $0.50 per cupcake.</p>
+        <p>{order.notes || "Add notes if you have a theme, topper idea, or other special instruction."}</p>
+      </div>
 
-        <section className="cake-summary-group" aria-label="Cupcake details">
-          <h4>Cupcakes</h4>
-          <dl>
-            <div>
-              <dt>Order date</dt>
-              <dd>{orderDate}</dd>
-            </div>
-            <div>
-              <dt>Quantity</dt>
-              <dd>{pricing.quantity}</dd>
-            </div>
-            <div>
-              <dt>Flavor</dt>
-              <dd>{flavor.label}</dd>
-            </div>
-            <div>
-              <dt>Price each</dt>
-              <dd>$3.50</dd>
-            </div>
-            <div>
-              <dt>Filling</dt>
-              <dd>
-                {filling.value === "none" ? "No filling" : `${filling.label} (+$0.50 each)`}
-              </dd>
-            </div>
-            <div>
-              <dt>Cupcake color</dt>
-              <dd>{outsideColor.label}</dd>
-            </div>
-            <div>
-              <dt>Estimated total</dt>
-              <dd>${pricing.total.toFixed(2)}</dd>
-            </div>
-          </dl>
-        </section>
+      <div className="cake-summary-actions">
+        <button
+          className="hero-button hero-button-primary payment-button"
+          type="button"
+          onClick={() => onSave(order)}
+        >
+          {isEditing ? "Update cupcakes in cart" : "Add cupcakes to cart"}
+        </button>
+        {isEditing ? (
+          <button
+            className="hero-button hero-button-secondary payment-button"
+            type="button"
+            onClick={onCancelEdit}
+          >
+            Cancel edit
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
 
-        <section className="cake-summary-group" aria-label="Pickup details">
-          <h4>Pickup</h4>
-          <dl>
-            <div>
-              <dt>Date</dt>
-              <dd>{order.pickupDate || "Choose a pickup date"}</dd>
-            </div>
-            <div>
-              <dt>Time</dt>
-              <dd>{formatPickupTime(order.pickupTime)}</dd>
-            </div>
-          </dl>
-        </section>
+function CartCheckoutPanel({
+  panelId,
+  panelRef,
+  cartItems,
+  checkoutDetails,
+  updateCheckoutDetails,
+  minPickupDate,
+  onEditItem,
+  onRemoveItem,
+  payload,
+  readyForPayment,
+  cartTotal,
+}) {
+  return (
+    <aside
+      className="cake-summary-card cart-summary-card"
+      id={panelId}
+      ref={panelRef}
+    >
+      <p className="eyebrow">Checkout</p>
+      <h3>Your order cart</h3>
+      <p className="cake-builder-copy cart-checkout-copy">
+        Add multiple products here first, then check out once for the whole
+        order. Pickup and contact details apply to everything in your cart.
+      </p>
 
-        <section className="cake-summary-group" aria-label="Contact information">
-          <h4>Contact</h4>
-          <dl>
-            <div>
-              <dt>Name</dt>
-              <dd>{order.customerName || "Add your name"}</dd>
-            </div>
-            <div>
-              <dt>Phone</dt>
-              <dd>{order.phone || "Add a phone number"}</dd>
-            </div>
-            <div>
-              <dt>Email</dt>
-              <dd>{order.email || "Add an email"}</dd>
-            </div>
-          </dl>
-        </section>
+      <section className="cake-summary-group" aria-label="Cart items">
+        <h4>Items</h4>
+        {cartItems.length ? (
+          <div className="cart-item-list">
+            {cartItems.map((item) => (
+              <article className="cart-item-card" key={item.id}>
+                <div className="cart-item-header">
+                  <strong>{getCartItemTitle(item)}</strong>
+                  <span>${getCartItemPrice(item).toFixed(2)}</span>
+                </div>
+                <ul className="cart-item-meta">
+                  {getCartItemSummaryLines(item).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+                <div className="cart-item-actions">
+                  <button type="button" className="cart-item-action" onClick={() => onEditItem(item)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="cart-item-action cart-item-action-danger"
+                    onClick={() => onRemoveItem(item.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="cart-empty-state">
+            <p>No products in the cart yet.</p>
+            <p>Start by customizing a cake or cupcakes, then add it to the cart.</p>
+          </div>
+        )}
+      </section>
 
-        <div className="cake-summary-note">
-          <p>
-            Full payment is collected through Square at checkout. Cupcake
-            orders also need at least two days notice and remain subject to
-            availability review.
-          </p>
-          <p>
-            Cupcakes are $3.50 each no matter the amount. If you add filling,
-            it applies to every cupcake and adds $0.50 per cupcake.
-          </p>
-          <p>{order.notes || "Add notes if you have a theme, topper idea, or other special instruction."}</p>
+      <section className="cake-summary-group" aria-label="Shared pickup details">
+        <h4>Pickup</h4>
+        <div className="form-grid shared-checkout-grid">
+          <label className="form-field">
+            <span>Pickup date</span>
+            <input
+              min={minPickupDate}
+              name="pickupDate"
+              type="date"
+              value={checkoutDetails.pickupDate}
+              onChange={updateCheckoutDetails}
+            />
+            <small>Minimum 2 days notice required.</small>
+          </label>
+
+          <label className="form-field">
+            <span>Pickup time</span>
+            <input
+              name="pickupTime"
+              type="time"
+              value={checkoutDetails.pickupTime}
+              onChange={updateCheckoutDetails}
+            />
+          </label>
         </div>
+      </section>
 
-        <div className="cake-summary-actions">
-          <SquareCheckoutButton
-            payload={buildCupcakePaymentPayload(order)}
-            disabled={!readyForPayment}
-            label={`Pay $${pricing.total.toFixed(2)} with Square`}
-          />
+      <section className="cake-summary-group" aria-label="Shared contact details">
+        <h4>Contact</h4>
+        <div className="form-grid shared-checkout-grid">
+          <label className="form-field">
+            <span>Your name</span>
+            <input
+              name="customerName"
+              placeholder="Full name"
+              type="text"
+              value={checkoutDetails.customerName}
+              onChange={updateCheckoutDetails}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Phone number</span>
+            <input
+              name="phone"
+              placeholder="(732) 555-1234"
+              type="tel"
+              value={checkoutDetails.phone}
+              onChange={updateCheckoutDetails}
+            />
+          </label>
+
+          <label className="form-field form-field-full">
+            <span>Email</span>
+            <input
+              name="email"
+              placeholder="name@email.com"
+              type="email"
+              value={checkoutDetails.email}
+              onChange={updateCheckoutDetails}
+            />
+          </label>
         </div>
-      </aside>
-    </div>
+      </section>
+
+      <div className="cake-summary-note">
+        <p>Cart total: ${cartTotal.toFixed(2)}</p>
+        <p>
+          Every product in the cart keeps its own custom details, and checkout
+          happens one time at the end.
+        </p>
+      </div>
+
+      <div className="cake-summary-actions">
+        <SquareCheckoutButton
+          payload={payload}
+          disabled={!readyForPayment}
+          label={`Pay $${cartTotal.toFixed(2)} with Square`}
+        />
+      </div>
+    </aside>
   );
 }
 

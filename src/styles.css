@@ -689,6 +689,42 @@ h1 {
   margin-top: 2rem;
 }
 
+.checkout-helper-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 24px;
+  border: 1px solid rgba(236, 197, 215, 0.82);
+  background:
+    radial-gradient(circle at top right, rgba(255, 226, 238, 0.92), transparent 42%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 241, 246, 0.98));
+  box-shadow: 0 12px 22px rgba(191, 63, 118, 0.12);
+}
+
+.checkout-helper-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.checkout-helper-copy strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.checkout-helper-copy span {
+  color: var(--accent-deep);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.checkout-helper-button {
+  width: auto;
+  min-width: 11rem;
+}
+
 .custom-order-toggle {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -765,6 +801,87 @@ h1 {
   line-height: 1.75;
 }
 
+.cake-product-picker-shell {
+  margin-top: 0.95rem;
+}
+
+.cake-product-picker-copy h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.cake-product-picker-copy p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.cake-product-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.95rem;
+}
+
+.cake-product-option {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(236, 197, 215, 0.82);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 242, 247, 0.96));
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(191, 63, 118, 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.cake-product-option:hover {
+  transform: translateY(-1px);
+}
+
+.cake-product-option.is-active {
+  border-color: rgba(227, 107, 156, 0.7);
+  box-shadow: 0 14px 24px rgba(227, 107, 156, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(255, 226, 238, 0.92), transparent 38%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 239, 245, 0.98));
+}
+
+.cake-product-option img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.cake-product-option-name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: left;
+  color: var(--ink);
+}
+
+.cake-product-option-cta {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(244, 173, 203, 0.22);
+  color: var(--accent-deep);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .order-form-photo-card {
   margin: 0.55rem 0 0;
   padding: 0.72rem;
@@ -835,6 +952,7 @@ h1 {
 .form-field {
   display: grid;
   gap: 0.45rem;
+  align-content: start;
 }
 
 .form-field-full {
@@ -842,6 +960,8 @@ h1 {
 }
 
 .form-field span {
+  display: flex;
+  align-items: flex-end;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -850,7 +970,9 @@ h1 {
 }
 
 .form-field small {
+  display: block;
   color: var(--muted);
+  line-height: 1.4;
 }
 
 .form-field input,
@@ -945,6 +1067,104 @@ h1 {
   display: grid;
   gap: 0.75rem;
   margin-top: 1.15rem;
+}
+
+.builder-preview-group {
+  margin-top: 1.2rem;
+}
+
+.shared-checkout-grid {
+  gap: 0.85rem;
+}
+
+.cart-checkout-copy {
+  max-width: 34rem;
+}
+
+.cart-item-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.cart-item-card {
+  padding: 0.95rem;
+  border-radius: 22px;
+  border: 1px solid rgba(236, 197, 215, 0.82);
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 242, 247, 0.96));
+  box-shadow: 0 10px 20px rgba(191, 63, 118, 0.08);
+}
+
+.cart-item-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.cart-item-header strong,
+.cart-item-header span {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.cart-item-header span {
+  color: var(--accent-deep);
+  white-space: nowrap;
+}
+
+.cart-item-meta {
+  margin: 0.75rem 0 0;
+  padding-left: 1rem;
+  color: var(--muted);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cart-item-meta li {
+  line-height: 1.55;
+}
+
+.cart-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.cart-item-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.6rem;
+  padding: 0.58rem 0.95rem;
+  border: 1px solid rgba(236, 197, 215, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.98);
+  color: var(--accent-deep);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cart-item-action-danger {
+  color: #9a365b;
+}
+
+.cart-empty-state {
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px dashed rgba(236, 197, 215, 0.92);
+  background: rgba(255, 251, 247, 0.84);
+}
+
+.cart-empty-state p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.cart-empty-state p + p {
+  margin-top: 0.45rem;
 }
 
 .payment-button-wrap {
@@ -1777,9 +1997,46 @@ h1 {
     gap: 0.55rem;
   }
 
-  .cake-step-strip,
-  .form-grid {
+  .cake-step-strip {
     grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+  }
+
+  .form-field span {
+    min-height: 2.2em;
+  }
+
+  .form-field input,
+  .form-field select {
+    min-height: 3.4rem;
+  }
+
+  .form-field small {
+    min-height: 2.6em;
+  }
+
+  .checkout-helper-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .checkout-helper-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cake-product-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cart-item-header,
+  .cart-item-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .custom-order-toggle {
@@ -2214,11 +2471,69 @@ h1 {
     padding: 0.28rem;
   }
 
+  .checkout-helper-bar {
+    position: sticky;
+    bottom: 0.6rem;
+    z-index: 7;
+    margin-top: 0.2rem;
+    margin-bottom: 0.9rem;
+    padding: 0.82rem 0.88rem;
+  }
+
   .order-toggle-button {
     min-height: 2.7rem;
     padding: 0.65rem 0.45rem;
     font-size: 0.88rem;
     letter-spacing: 0.01em;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.72rem;
+  }
+
+  .form-field span {
+    min-height: 2.3em;
+  }
+
+  .form-field input,
+  .form-field select {
+    min-height: 3.25rem;
+    padding: 0.82rem 0.9rem;
+  }
+
+  .form-field small {
+    min-height: 2.8em;
+    font-size: 0.9rem;
+  }
+
+  .cake-product-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .cake-product-option {
+    padding: 0.58rem;
+    gap: 0.55rem;
+  }
+
+  .cake-product-picker-copy h4 {
+    font-size: 1rem;
+  }
+
+  .cake-product-picker-copy p {
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .cake-product-option-name {
+    font-size: 0.84rem;
+  }
+
+  .cake-product-option-cta {
+    min-height: 1.85rem;
+    padding: 0.3rem 0.58rem;
+    font-size: 0.7rem;
   }
 }
 

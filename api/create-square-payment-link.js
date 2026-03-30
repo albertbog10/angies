@@ -10,6 +10,14 @@ const cakeSizeConfig = {
   "10-inch": { label: '10"', amount: 8500 },
 };
 
+const cakeProductLabels = {
+  cakept1: "cakept1",
+  cakept2: "cakept2",
+  cakept3: "cakept3",
+  cakept4: "cakept4",
+  cakept5: "cakept5",
+};
+
 const optionLabels = {
   eventType: {
     birthday: "Birthday",
@@ -50,6 +58,7 @@ const optionLabels = {
 
 const requiredString = (value) => typeof value === "string" && value.trim().length > 0;
 const getLabel = (group, value) => optionLabels[group]?.[value] ?? value ?? "";
+const getCakeProductLabel = (value) => cakeProductLabels[value] || value || "cake";
 
 const readRawBody = async (req) => {
   if (typeof req.body === "string") {
@@ -113,7 +122,7 @@ const buildCakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
 
   const lineItems = [
     {
-      name: `Custom cake ${size.label}`,
+      name: `${getCakeProductLabel(order.productKey)} ${size.label}`,
       quantity: "1",
       base_price_money: {
         amount: size.amount,
@@ -140,6 +149,7 @@ const buildCakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
     `Customer: ${order.customerName}`,
     `Phone: ${order.phone}`,
     `Email: ${order.email}`,
+    `Product: ${getCakeProductLabel(order.productKey)}`,
     `Cake size: ${size.label}`,
     `Cake flavor: ${getLabel("flavor", order.flavor)}`,
     `Included filling: ${getLabel("filling", order.filling)}`,
@@ -240,6 +250,114 @@ const buildCupcakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
   };
 };
 
+const buildCartItemSummary = (item) => {
+  if (item?.type === "cake") {
+    const size = cakeSizeConfig[item.order?.cakeSize];
+    if (!size) {
+      throw new Error("Select a valid cake size.");
+    }
+
+    const extraFillingCharge =
+      item.order?.extraFilling && item.order.extraFilling !== "none" ? 1000 : 0;
+
+    return {
+      name: `${getCakeProductLabel(item.order?.productKey)} ${size.label}`,
+      amount: size.amount + extraFillingCharge,
+      note: [
+        `Product: ${getCakeProductLabel(item.order?.productKey)}`,
+        `Occasion: ${getLabel("eventType", item.order?.eventType)}`,
+        `Cake size: ${size.label}`,
+        `Cake flavor: ${getLabel("flavor", item.order?.flavor)}`,
+        `Included filling: ${getLabel("filling", item.order?.filling)}`,
+        `Extra filling: ${
+          item.order?.extraFilling === "none"
+            ? "None"
+            : getLabel("filling", item.order?.extraFilling)
+        }`,
+        `Frosting: ${getLabel("frosting", item.order?.frosting)}`,
+        `Outside cake color: ${getLabel("outsideColor", item.order?.outsideColor)}`,
+        `Message: ${item.order?.inscription || "None"}`,
+        `Notes: ${item.order?.notes || "None"}`,
+      ].join(" | ").slice(0, 500),
+    };
+  }
+
+  if (item?.type === "cupcake") {
+    const quantity = Math.max(1, Number(item.order?.quantity) || 0);
+    const fillingSurcharge =
+      item.order?.filling && item.order.filling !== "none" ? quantity * 50 : 0;
+
+    return {
+      name: `Custom cupcakes (${quantity})`,
+      amount: quantity * 350 + fillingSurcharge,
+      note: [
+        `Quantity: ${quantity}`,
+        `Cupcake flavor: ${getLabel("flavor", item.order?.flavor)}`,
+        `Filling: ${
+          item.order?.filling === "none" ? "None" : getLabel("filling", item.order?.filling)
+        }`,
+        `Cupcake color: ${getLabel("outsideColor", item.order?.outsideColor)}`,
+        `Notes: ${item.order?.notes || "None"}`,
+      ].join(" | ").slice(0, 500),
+    };
+  }
+
+  throw new Error("Unsupported cart item.");
+};
+
+const buildCartCheckoutRequest = (cart, siteOrigin, supportEmail) => {
+  const checkout = cart?.checkout || {};
+  const items = Array.isArray(cart?.items) ? cart.items : [];
+
+  const lineItems = items.map((item, index) => {
+    const summary = buildCartItemSummary(item);
+
+    return {
+      name: `${index + 1}. ${summary.name}`,
+      quantity: "1",
+      base_price_money: {
+        amount: summary.amount,
+        currency: "USD",
+      },
+      note: summary.note,
+    };
+  });
+
+  const paymentNote = [
+    "Order type: Custom order cart",
+    `Pickup date: ${checkout.pickupDate}`,
+    `Pickup time: ${checkout.pickupTime}`,
+    `Customer: ${checkout.customerName}`,
+    `Phone: ${checkout.phone}`,
+    `Email: ${checkout.email}`,
+    `Items in cart: ${items.length}`,
+    `Estimated total: $${(lineItems.reduce((sum, item) => sum + item.base_price_money.amount, 0) / 100).toFixed(2)}`,
+  ].join(" | ").slice(0, 500);
+
+  const normalizedPhone = normalizePhoneForSquare(checkout.phone);
+
+  return {
+    idempotency_key: crypto.randomUUID(),
+    description: `Custom order for ${checkout.customerName}`,
+    order: {
+      location_id: process.env.SQUARE_LOCATION_ID,
+      note: paymentNote,
+      line_items: lineItems,
+    },
+    checkout_options: {
+      redirect_url: `${siteOrigin}/cake-order.html?payment=success&type=cart#payment-status`,
+      allow_tipping: false,
+      enable_coupon: false,
+      ...(supportEmail ? { merchant_support_email: supportEmail } : {}),
+    },
+    pre_populated_data: {
+      buyer_email: checkout.email,
+      ...(normalizedPhone ? { buyer_phone_number: normalizedPhone } : {}),
+    },
+    payment_note: paymentNote,
+  };
+};
+
 const validateCakeOrder = (order) => {
   if (!requiredString(order.pickupDate) || !requiredString(order.pickupTime)) {
     throw new Error("Choose a pickup date and time.");
@@ -261,6 +379,46 @@ const validateCupcakeOrder = (order) => {
   }
 };
 
+const validateCartOrder = (cart) => {
+  const items = Array.isArray(cart?.items) ? cart.items : [];
+  const checkout = cart?.checkout || {};
+
+  if (!items.length) {
+    throw new Error("Add at least one product to the cart.");
+  }
+
+  if (!requiredString(checkout.pickupDate) || !requiredString(checkout.pickupTime)) {
+    throw new Error("Choose a pickup date and time.");
+  }
+
+  if (
+    !requiredString(checkout.customerName) ||
+    !requiredString(checkout.phone) ||
+    !requiredString(checkout.email)
+  ) {
+    throw new Error("Name, phone, and email are required.");
+  }
+
+  items.forEach((item) => {
+    if (item?.type === "cake") {
+      const size = cakeSizeConfig[item.order?.cakeSize];
+      if (!size) {
+        throw new Error("Select a valid cake size.");
+      }
+      return;
+    }
+
+    if (item?.type === "cupcake") {
+      if ((Number(item.order?.quantity) || 0) < 1) {
+        throw new Error("Enter a valid cupcake quantity.");
+      }
+      return;
+    }
+
+    throw new Error("Unsupported cart item.");
+  });
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed." });
@@ -279,7 +437,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { orderType, order } = await readJsonBody(req);
+    const { orderType, order, cart } = await readJsonBody(req);
     const siteOrigin = getSiteOrigin(req);
     const supportEmail = process.env.SQUARE_SUPPORT_EMAIL || "";
 
@@ -291,6 +449,9 @@ export default async function handler(req, res) {
     } else if (orderType === "cupcake") {
       validateCupcakeOrder(order);
       requestBody = buildCupcakeCheckoutRequest(order, siteOrigin, supportEmail);
+    } else if (orderType === "cart") {
+      validateCartOrder(cart);
+      requestBody = buildCartCheckoutRequest(cart, siteOrigin, supportEmail);
     } else {
       return res.status(400).json({ error: "Unsupported order type." });
     }
