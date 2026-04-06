@@ -253,15 +253,33 @@ const cakeColorOptions = [
 ];
 
 const cakeProductOptions = [
-  { value: "cakept1", label: "cakept1", src: "/images/food/cakept1.jpeg" },
-  { value: "cakept2", label: "cakept2", src: "/images/food/cakept2.jpeg" },
-  { value: "cakept3", label: "cakept3", src: "/images/food/cakept3.jpeg" },
-  { value: "cakept4", label: "cakept4", src: "/images/food/cakept4.jpeg" },
-  { value: "cakept5", label: "cakept5", src: "/images/food/cakept5.jpeg" },
+  { value: "rose-cake", label: "Rose Cake", src: "/images/food/Rose Cake.png" },
+  { value: "cookie-cake", label: "Cookie Cake", src: "/images/food/Cookie Cake.png" },
+  {
+    value: "strawberry-cake",
+    label: "Fresh Strawberry Cake",
+    src: "/images/food/Fresh Strawberry Cake.png",
+  },
+  {
+    value: "rose-frosting-cake",
+    label: "Rose Frosting Cake",
+    src: "/images/food/Rose Frosting Cake.png",
+  },
+  {
+    value: "bowtie-cake",
+    label: "Bowtie Fruit Cake",
+    src: "/images/food/Bowtie Fruit Cake.png",
+  },
+  { value: "plain-cake", label: "Plain Cake", src: "/images/food/Plain Cake.png" },
+  {
+    value: "decoration-flower-cake",
+    label: "Decoration Flower Cake",
+    src: "/images/food/Decoration Flower Cake.png",
+  },
 ];
 
 const defaultCakeOrder = {
-  productKey: "cakept1",
+  productKey: "cookie-cake",
   eventType: "birthday",
   cakeSize: "8-inch",
   flavor: "yellow",
@@ -1302,6 +1320,8 @@ function CustomOrderSection() {
 }
 
 function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }) {
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   const updateOrder = (event) => {
     const { name, value } = event.target;
     setOrder((current) => ({
@@ -1557,11 +1577,35 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
         <p>{order.notes || "Add notes if you have a theme, writing request, or other special instruction."}</p>
       </div>
 
+      <div className="cake-terms-box" aria-label="Cake order terms">
+        <p>WE RESERVE THE RIGHT TO CANCEL ANY ORDER.</p>
+        <p>WARNING: CAKES MAY CONTAIN THE FOLLOWING ALLERGENS: EGGS, MILK, PEANUTS, WHEAT, SOY.</p>
+        <p className="cake-terms-warning">
+          WARNING: CAKES CONTAIN PLASTIC OR WOODEN STICKS INSIDE FOR SUPPORT.
+        </p>
+      </div>
+
+      <label className="cake-terms-check">
+        <input
+          checked={termsAccepted}
+          name="cakeTermsAccepted"
+          type="checkbox"
+          onChange={(event) => setTermsAccepted(event.target.checked)}
+        />
+        <span>I agree to the cake order terms above.</span>
+      </label>
+
       <div className="cake-summary-actions">
         <button
           className="hero-button hero-button-primary payment-button"
           type="button"
-          onClick={() => onSave(order)}
+          disabled={!isEditing && !termsAccepted}
+          onClick={() => {
+            onSave(order);
+            if (!isEditing) {
+              setTermsAccepted(false);
+            }
+          }}
         >
           {isEditing ? "Update cake in cart" : "Add cake to cart"}
         </button>
