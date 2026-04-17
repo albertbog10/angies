@@ -149,15 +149,16 @@ const buildCakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
     `Customer: ${order.customerName}`,
     `Phone: ${order.phone}`,
     `Email: ${order.email}`,
-    `Product: ${getCakeProductLabel(order.productKey)}`,
+    `Cake name: ${getCakeProductLabel(order.productKey)}`,
+    `Occasion: ${getLabel("eventType", order.eventType)}`,
     `Cake size: ${size.label}`,
     `Cake flavor: ${getLabel("flavor", order.flavor)}`,
     `Included filling: ${getLabel("filling", order.filling)}`,
     `Extra filling: ${order.extraFilling === "none" ? "None" : getLabel("filling", order.extraFilling)}`,
     `Frosting: ${getLabel("frosting", order.frosting)}`,
     `Outside cake color: ${getLabel("outsideColor", order.outsideColor)}`,
-    `Message: ${order.inscription || "None"}`,
-    `Notes: ${order.notes || "None"}`,
+    `Message on cake: ${order.inscription || "None"}`,
+    `Cake notes: ${order.notes || "None"}`,
   ].join(" | ").slice(0, 500);
 
   const normalizedPhone = normalizePhoneForSquare(order.phone);
@@ -264,7 +265,7 @@ const buildCartItemSummary = (item) => {
       name: `${getCakeProductLabel(item.order?.productKey)} ${size.label}`,
       amount: size.amount + extraFillingCharge,
       note: [
-        `Product: ${getCakeProductLabel(item.order?.productKey)}`,
+        `Cake name: ${getCakeProductLabel(item.order?.productKey)}`,
         `Occasion: ${getLabel("eventType", item.order?.eventType)}`,
         `Cake size: ${size.label}`,
         `Cake flavor: ${getLabel("flavor", item.order?.flavor)}`,
@@ -276,8 +277,8 @@ const buildCartItemSummary = (item) => {
         }`,
         `Frosting: ${getLabel("frosting", item.order?.frosting)}`,
         `Outside cake color: ${getLabel("outsideColor", item.order?.outsideColor)}`,
-        `Message: ${item.order?.inscription || "None"}`,
-        `Notes: ${item.order?.notes || "None"}`,
+        `Message on cake: ${item.order?.inscription || "None"}`,
+        `Cake notes: ${item.order?.notes || "None"}`,
       ].join(" | ").slice(0, 500),
     };
   }

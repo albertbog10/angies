@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import {appendOrderRecord} from "./_order-dashboard-store.js";
 
 const SQUARE_API_VERSION = "2026-01-22";
 const SQUARE_GET_PAYMENT_URL = "https://connect.squareup.com/v2/payments";
@@ -173,12 +174,15 @@ const mergeOrderDetailsIntoPayment = (payment = {}, order = {}) => {
   }
 
   const existingNote = payment.note || payment.payment_note || "";
-  const mergedNote = existingNote || orderDetailsText;
+  const mergedNote = [existingNote, orderDetailsText]
+    .filter(Boolean)
+    .join(" | ")
+    .slice(0, 3500);
 
   return {
     ...payment,
     note: mergedNote,
-    payment_note: payment.payment_note || mergedNote,
+    payment_note: mergedNote,
   };
 };
 
@@ -284,6 +288,20 @@ const buildOrderDetails = (payment) => {
     orderId,
     paymentId,
     details,
+  };
+};
+
+const buildDashboardRecord = (payment) => {
+  const {amount, orderId, paymentId, details} = buildOrderDetails(payment);
+  return {
+    createdAt: new Date().toISOString(),
+    amount,
+    orderId,
+    paymentId,
+    customerEmail: getCustomerEmail(payment),
+    details,
+    receiptUrl: payment.receipt_url || "",
+    source: "square-webhook",
   };
 };
 
@@ -427,8 +445,12 @@ const sendOrderNotification = async (payment) => {
     );
   }
 
+  if (channelPreference === "dashboard" || channelPreference === "none") {
+    return {channel: "dashboard", customerEmail, customerEmailSent: false};
+  }
+
   throw new Error(
-    "Invalid ORDER_NOTIFICATION_CHANNEL. Use 'email', 'sms', or 'auto'.",
+    "Invalid ORDER_NOTIFICATION_CHANNEL. Use 'email', 'sms', 'auto', 'dashboard', or 'none'.",
   );
 };
 
@@ -490,11 +512,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (
-      payment?.order_id &&
-      !String(payment.note || payment.payment_note || "").trim() &&
-      process.env.SQUARE_ACCESS_TOKEN
-    ) {
+    if (payment?.order_id && process.env.SQUARE_ACCESS_TOKEN) {
       try {
         const order = await fetchOrderById(payment.order_id);
         payment = mergeOrderDetailsIntoPayment(payment, order);
@@ -509,6 +527,13 @@ export default async function handler(req, res) {
 
     if (payment.status !== "COMPLETED") {
       return res.status(200).json({ ignored: true, reason: `Payment status is ${payment.status}` });
+    }
+
+    const dashboardRecord = buildDashboardRecord(payment);
+    try {
+      await appendOrderRecord(dashboardRecord);
+    } catch {
+      // Do not block webhook processing if dashboard persistence fails.
     }
 
     const notification = await sendOrderNotification(payment);

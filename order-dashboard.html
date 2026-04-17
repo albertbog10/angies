@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Angie's Order Dashboard</title>
+    <style>
+      :root {
+        --bg: #fff8fb;
+        --card: #ffffff;
+        --ink: #3b1730;
+        --muted: #70586b;
+        --line: #efc7d8;
+        --accent: #c65085;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top right, #ffe6f0, var(--bg) 42%);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(980px, 100%);
+        margin: 0 auto;
+        padding: 1.25rem 1rem 3rem;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-radius: 20px;
+        padding: 1rem;
+        box-shadow: 0 14px 26px rgba(198, 80, 133, 0.12);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.5rem, 4vw, 2.2rem);
+      }
+
+      p {
+        margin: 0.55rem 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .toolbar {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+      }
+
+      button {
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 0.62rem 1rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .secondary {
+        background: #fff;
+        color: var(--accent);
+        border-color: var(--line);
+      }
+
+      .status {
+        margin-top: 0.65rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .list {
+        margin-top: 1rem;
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .order-card {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 16px;
+        padding: 0.85rem;
+      }
+
+      .order-head {
+        display: flex;
+        gap: 0.65rem;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        align-items: baseline;
+      }
+
+      .order-head strong {
+        font-size: 1.02rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: #ffe6f0;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 0.2rem 0.55rem;
+      }
+
+      .meta {
+        margin-top: 0.55rem;
+        font-size: 0.92rem;
+        color: var(--muted);
+        display: grid;
+        gap: 0.2rem;
+      }
+
+      .details {
+        margin-top: 0.6rem;
+        white-space: pre-wrap;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff8fb;
+        padding: 0.65rem;
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>Temporary Order Dashboard</h1>
+        <p>Shows recent paid Square orders captured by the webhook.</p>
+        <div class="toolbar">
+          <button class="primary" id="refreshBtn" type="button">Refresh</button>
+          <button class="secondary" id="clearBtn" type="button">Clear list</button>
+        </div>
+        <p class="status" id="status">Loading orders...</p>
+      </section>
+
+      <section class="list" id="ordersList" aria-live="polite"></section>
+    </main>
+
+    <script>
+      const statusNode = document.getElementById("status");
+      const listNode = document.getElementById("ordersList");
+      const refreshButton = document.getElementById("refreshBtn");
+      const clearButton = document.getElementById("clearBtn");
+      const DASHBOARD_ENDPOINTS = [
+        "/api/order-dashboard",
+        "/.netlify/functions/order-dashboard",
+      ];
+
+      const escapeHtml = (value = "") =>
+        String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+
+      const setStatus = (text) => {
+        statusNode.textContent = text;
+      };
+
+      const formatDate = (iso) => {
+        if (!iso) return "Unknown";
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return iso;
+        return date.toLocaleString();
+      };
+
+      const parseJson = async (response) => {
+        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+        if (!contentType.includes("application/json")) {
+          const raw = await response.text();
+          const preview = raw.slice(0, 32);
+          throw new Error(
+            `Dashboard API returned non-JSON content (${preview || "empty response"}).`,
+          );
+        }
+        return response.json();
+      };
+
+      const requestDashboard = async (method = "GET") => {
+        const failures = [];
+
+        for (const endpoint of DASHBOARD_ENDPOINTS) {
+          try {
+            const response = await fetch(endpoint, {method});
+            const data = await parseJson(response);
+            if (!response.ok) {
+              throw new Error(data.error || `Dashboard request failed (${response.status}).`);
+            }
+            return data;
+          } catch (error) {
+            failures.push(error instanceof Error ? error.message : "Unknown request failure.");
+          }
+        }
+
+        throw new Error(
+          failures[0] ||
+            "Unable to load dashboard data. Please verify your API route is running.",
+        );
+      };
+
+      const renderOrders = (orders = []) => {
+        if (!orders.length) {
+          listNode.innerHTML =
+            '<article class="order-card"><p>No paid orders yet.</p></article>';
+          return;
+        }
+
+        listNode.innerHTML = orders
+          .map(
+            (order) => `
+              <article class="order-card">
+                <div class="order-head">
+                  <strong>${escapeHtml(order.amount || "Unknown amount")}</strong>
+                  <span class="pill">${escapeHtml(formatDate(order.createdAt))}</span>
+                </div>
+                <div class="meta">
+                  <span><strong>Order:</strong> ${escapeHtml(order.orderId || "Unknown")}</span>
+                  <span><strong>Payment:</strong> ${escapeHtml(order.paymentId || "Unknown")}</span>
+                  <span><strong>Email:</strong> ${escapeHtml(order.customerEmail || "Not provided")}</span>
+                  ${
+                    order.receiptUrl
+                      ? `<span><a href="${escapeHtml(order.receiptUrl)}" target="_blank" rel="noopener noreferrer">Square receipt</a></span>`
+                      : ""
+                  }
+                </div>
+                <div class="details">${escapeHtml(order.details || "No details included.")}</div>
+              </article>
+            `,
+          )
+          .join("");
+      };
+
+      const fetchOrders = async () => {
+        setStatus("Loading orders...");
+        try {
+          const data = await requestDashboard("GET");
+          renderOrders(Array.isArray(data.orders) ? data.orders : []);
+          setStatus(`Loaded ${data.count || 0} order(s).`);
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : "Failed to load dashboard.");
+        }
+      };
+
+      const clearOrders = async () => {
+        if (!window.confirm("Clear all stored dashboard orders?")) {
+          return;
+        }
+        setStatus("Clearing orders...");
+        try {
+          await requestDashboard("DELETE");
+          renderOrders([]);
+          setStatus("Dashboard list cleared.");
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : "Failed to clear dashboard.");
+        }
+      };
+
+      refreshButton.addEventListener("click", fetchOrders);
+      clearButton.addEventListener("click", clearOrders);
+      fetchOrders();
+    </script>
+  </body>
+</html>

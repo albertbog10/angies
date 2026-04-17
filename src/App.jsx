@@ -448,32 +448,57 @@ const getCartItemSummaryLines = (item) => {
   ];
 };
 
-const requestCheckoutLink = async (payload) => {
-  const response = await fetch("/api/create-square-payment-link", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+const checkoutApiEndpoints = [
+  "/api/create-square-payment-link",
+  "/.netlify/functions/create-square-payment-link",
+];
 
+const parseApiResponseData = async (response) => {
   const rawBody = await response.text();
   let data = {};
+
   try {
     data = rawBody ? JSON.parse(rawBody) : {};
   } catch {
     data = {};
   }
 
-  if (!response.ok || !data.checkoutUrl) {
-    throw new Error(
-      data.error ||
-        rawBody ||
-        "Unable to start Square checkout right now.",
-    );
+  return {rawBody, data};
+};
+
+const requestCheckoutLink = async (payload) => {
+  let lastError = null;
+
+  for (const endpoint of checkoutApiEndpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const {rawBody, data} = await parseApiResponseData(response);
+
+      if (!response.ok || !data.checkoutUrl) {
+        throw new Error(
+          data.error ||
+            rawBody ||
+            "Unable to start Square checkout right now.",
+        );
+      }
+
+      return data.checkoutUrl;
+    } catch (error) {
+      lastError =
+        error instanceof Error
+          ? error
+          : new Error("Unable to start Square checkout right now.");
+    }
   }
 
-  return data.checkoutUrl;
+  throw lastError || new Error("Unable to start Square checkout right now.");
 };
 
 const saveCheckoutReceipt = (payload) => {
@@ -970,7 +995,7 @@ function CakeOrderPage() {
         ["Status", "Paid"],
         [
           "Order details",
-          "Saved details were not found on this device, but payment and notification emails were sent.",
+          "Saved details were not found on this device, but payment and order notifications were sent.",
         ],
       ];
 
@@ -1018,8 +1043,8 @@ function CakeOrderPage() {
                 : "Thanks for your cake order."}
             </h2>
             <p>
-              Payment was received successfully. A confirmation email was sent to the
-              customer, and a full order copy was sent to the bakery owner.
+              Payment was received successfully. Order notifications were sent to
+              the customer and bakery owner.
             </p>
 
             <dl className="post-checkout-details" aria-label="Order details">
