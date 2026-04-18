@@ -138,6 +138,53 @@
         padding: 0.65rem;
         font-size: 0.92rem;
       }
+
+      .cake-details {
+        margin-top: 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff8fb;
+        padding: 0.65rem;
+      }
+
+      .cake-details h3 {
+        margin: 0;
+        font-size: 0.95rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .cake-grid {
+        margin-top: 0.45rem;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem 0.75rem;
+      }
+
+      .cake-field {
+        min-width: 0;
+      }
+
+      .cake-field-label {
+        margin: 0;
+        font-size: 0.78rem;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+
+      .cake-field-value {
+        margin: 0.2rem 0 0;
+        font-size: 0.92rem;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      @media (max-width: 640px) {
+        .cake-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
@@ -182,6 +229,109 @@
         const date = new Date(iso);
         if (Number.isNaN(date.getTime())) return iso;
         return date.toLocaleString();
+      };
+
+      const CAKE_FIELDS = [
+        {
+          key: "cakeName",
+          label: "Cake name",
+          prefixes: ["cake name:", "product:"],
+        },
+        {
+          key: "occasion",
+          label: "Occasion",
+          prefixes: ["occasion:", "event type:"],
+        },
+        {
+          key: "cakeSize",
+          label: "Cake size",
+          prefixes: ["cake size:", "size:"],
+        },
+        {
+          key: "cakeFlavor",
+          label: "Cake flavor",
+          prefixes: ["cake flavor:", "flavor:"],
+        },
+        {
+          key: "extraFilling",
+          label: "Extra filling",
+          prefixes: ["extra filling:"],
+        },
+        {
+          key: "outsideCakeColor",
+          label: "Outside cake color",
+          prefixes: ["outside cake color:", "outside color:", "cake color:"],
+        },
+        {
+          key: "messageOnCake",
+          label: "Message on cake",
+          prefixes: ["message on cake:", "message:"],
+        },
+        {
+          key: "cakeNotes",
+          label: "Cake notes",
+          prefixes: ["cake notes:", "notes:"],
+        },
+      ];
+
+      const splitDetailsLines = (details) =>
+        String(details || "")
+          .split(/\n|\|/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+      const extractValuesForPrefixes = (lines, prefixes) => {
+        const matches = [];
+
+        lines.forEach((line) => {
+          const lowerLine = line.toLowerCase();
+          prefixes.forEach((prefix) => {
+            const lowerPrefix = prefix.toLowerCase();
+            const index = lowerLine.indexOf(lowerPrefix);
+            if (index < 0) {
+              return;
+            }
+
+            const value = line.slice(index + prefix.length).trim();
+            if (value) {
+              matches.push(value);
+            }
+          });
+        });
+
+        return [...new Set(matches)];
+      };
+
+      const extractCakeDetails = (details) => {
+        const lines = splitDetailsLines(details);
+        const fields = {};
+
+        CAKE_FIELDS.forEach((field) => {
+          const values = extractValuesForPrefixes(lines, field.prefixes);
+          fields[field.key] = values.length ? values.join(" | ") : "Not provided";
+        });
+
+        return fields;
+      };
+
+      const renderCakeDetails = (details) => {
+        const fields = extractCakeDetails(details);
+
+        const rows = CAKE_FIELDS.map(
+          (field) => `
+            <div class="cake-field">
+              <p class="cake-field-label">${escapeHtml(field.label)}</p>
+              <p class="cake-field-value">${escapeHtml(fields[field.key])}</p>
+            </div>
+          `,
+        ).join("");
+
+        return `
+          <section class="cake-details" aria-label="Cake details">
+            <h3>Baker Cake Details</h3>
+            <div class="cake-grid">${rows}</div>
+          </section>
+        `;
       };
 
       const parseJson = async (response) => {
@@ -243,6 +393,7 @@
                       : ""
                   }
                 </div>
+                ${renderCakeDetails(order.details)}
                 <div class="details">${escapeHtml(order.details || "No details included.")}</div>
               </article>
             `,

@@ -108,9 +108,22 @@ const normalizePhoneForSquare = (phone) => {
 };
 
 const getSiteOrigin = (req) => {
-  const protoHeader = String(req.headers["x-forwarded-proto"] || "https");
-  const proto = protoHeader.split(",")[0].trim() || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  const explicitOrigin = String(process.env.SITE_ORIGIN || "").trim();
+  if (explicitOrigin) {
+    return explicitOrigin.replace(/\/+$/, "");
+  }
+
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").trim();
+  const protoHeader = String(req.headers["x-forwarded-proto"] || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  const isLocalHost =
+    host.startsWith("localhost") ||
+    host.startsWith("127.0.0.1") ||
+    host.startsWith("[::1]");
+  const proto = protoHeader || (isLocalHost ? "http" : "https");
+
   return `${proto}://${host}`;
 };
 
