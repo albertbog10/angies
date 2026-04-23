@@ -2,12 +2,12 @@ import crypto from "node:crypto";
 
 const SQUARE_API_VERSION = "2026-01-22";
 const SQUARE_API_URL = "https://connect.squareup.com/v2/online-checkout/payment-links";
+const CART_CAKE_DISCOUNT_CODE = "99percent";
 
 const cakeSizeConfig = {
-  "1-inch-test": { label: '1" (test)', amount: 10 },
-  "6-inch": { label: '6"', amount: 6500 },
-  "8-inch": { label: '8"', amount: 7500 },
-  "10-inch": { label: '10"', amount: 8500 },
+  "6-inch": { label: '6"', amount: 8000 },
+  "8-inch": { label: '8"', amount: 9000 },
+  "10-inch": { label: '10"', amount: 10000 },
 };
 
 const cakeProductLabels = {
@@ -28,6 +28,7 @@ const optionLabels = {
   },
   flavor: {
     yellow: "Yellow",
+    vanilla: "Vanilla",
     chocolate: "Chocolate",
     marble: "Marble",
     "red-velvet": "Red velvet",
@@ -42,10 +43,6 @@ const optionLabels = {
     strawberry: "Strawberry",
     nutella: "Nutella",
   },
-  frosting: {
-    meringue: "Meringue frosting",
-    "whipped-icing": "Whipped icing frosting",
-  },
   outsideColor: {
     white: "White",
     pink: "Pink",
@@ -59,6 +56,9 @@ const optionLabels = {
 const requiredString = (value) => typeof value === "string" && value.trim().length > 0;
 const getLabel = (group, value) => optionLabels[group]?.[value] ?? value ?? "";
 const getCakeProductLabel = (value) => cakeProductLabels[value] || value || "cake";
+const normalizeDiscountCode = (value = "") => String(value).trim().toLowerCase();
+const hasCakeDiscount = (discountCode = "") =>
+  normalizeDiscountCode(discountCode) === CART_CAKE_DISCOUNT_CODE;
 
 const readRawBody = async (req) => {
   if (typeof req.body === "string") {
@@ -168,7 +168,6 @@ const buildCakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
     `Cake flavor: ${getLabel("flavor", order.flavor)}`,
     `Included filling: ${getLabel("filling", order.filling)}`,
     `Extra filling: ${order.extraFilling === "none" ? "None" : getLabel("filling", order.extraFilling)}`,
-    `Frosting: ${getLabel("frosting", order.frosting)}`,
     `Outside cake color: ${getLabel("outsideColor", order.outsideColor)}`,
     `Message on cake: ${order.inscription || "None"}`,
     `Cake notes: ${order.notes || "None"}`,
@@ -264,7 +263,7 @@ const buildCupcakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
   };
 };
 
-const buildCartItemSummary = (item) => {
+const buildCartItemSummary = (item, discountCode = "") => {
   if (item?.type === "cake") {
     const size = cakeSizeConfig[item.order?.cakeSize];
     if (!size) {
@@ -273,10 +272,14 @@ const buildCartItemSummary = (item) => {
 
     const extraFillingCharge =
       item.order?.extraFilling && item.order.extraFilling !== "none" ? 1000 : 0;
+    const amount = size.amount + extraFillingCharge;
+    const discountedAmount = hasCakeDiscount(discountCode)
+      ? Math.max(1, Math.round(amount * 0.01))
+      : amount;
 
     return {
       name: `${getCakeProductLabel(item.order?.productKey)} ${size.label}`,
-      amount: size.amount + extraFillingCharge,
+      amount: discountedAmount,
       note: [
         `Cake name: ${getCakeProductLabel(item.order?.productKey)}`,
         `Occasion: ${getLabel("eventType", item.order?.eventType)}`,
@@ -288,10 +291,12 @@ const buildCartItemSummary = (item) => {
             ? "None"
             : getLabel("filling", item.order?.extraFilling)
         }`,
-        `Frosting: ${getLabel("frosting", item.order?.frosting)}`,
         `Outside cake color: ${getLabel("outsideColor", item.order?.outsideColor)}`,
         `Message on cake: ${item.order?.inscription || "None"}`,
         `Cake notes: ${item.order?.notes || "None"}`,
+        ...(hasCakeDiscount(discountCode)
+          ? [`Discount code: ${CART_CAKE_DISCOUNT_CODE} (99% off applied)`]
+          : []),
       ].join(" | ").slice(0, 500),
     };
   }
@@ -322,9 +327,10 @@ const buildCartItemSummary = (item) => {
 const buildCartCheckoutRequest = (cart, siteOrigin, supportEmail) => {
   const checkout = cart?.checkout || {};
   const items = Array.isArray(cart?.items) ? cart.items : [];
+  const discountCode = checkout.discountCode;
 
   const lineItems = items.map((item, index) => {
-    const summary = buildCartItemSummary(item);
+    const summary = buildCartItemSummary(item, discountCode);
 
     return {
       name: `${index + 1}. ${summary.name}`,
@@ -345,6 +351,7 @@ const buildCartCheckoutRequest = (cart, siteOrigin, supportEmail) => {
     `Phone: ${checkout.phone}`,
     `Email: ${checkout.email}`,
     `Items in cart: ${items.length}`,
+    `Discount code: ${hasCakeDiscount(discountCode) ? CART_CAKE_DISCOUNT_CODE : "None"}`,
     `Estimated total: $${(lineItems.reduce((sum, item) => sum + item.base_price_money.amount, 0) / 100).toFixed(2)}`,
   ].join(" | ").slice(0, 500);
 

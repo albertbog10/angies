@@ -214,33 +214,23 @@ const cakeEventOptions = [
 ];
 
 const cakeSizeOptions = [
-  { value: "1-inch-test", label: '1" (test)', price: 0.1, serves: "Test checkout size" },
-  { value: "6-inch", label: '6"', price: 65, serves: "Serves 8-12" },
-  { value: "8-inch", label: '8"', price: 75, serves: "Serves 12-18" },
-  { value: "10-inch", label: '10"', price: 85, serves: "Serves 20-28" },
+  { value: "6-inch", label: '6"', price: 80, serves: "Serves 8-12" },
+  { value: "8-inch", label: '8"', price: 90, serves: "Serves 12-18" },
+  { value: "10-inch", label: '10"', price: 100, serves: "Serves 20-28" },
 ];
 
 const cakeFlavorOptions = [
-  { value: "yellow", label: "Yellow" },
+  { value: "vanilla", label: "Vanilla" },
   { value: "chocolate", label: "Chocolate" },
-  { value: "marble", label: "Marble" },
-  { value: "red-velvet", label: "Red velvet" },
-  { value: "dominican-cake", label: "Dominican cake" },
   { value: "tres-leches", label: "Tres leches" },
 ];
 
 const cakeFillingOptions = [
   { value: "none", label: "No filling" },
   { value: "dulce-de-leche", label: "Dulce de leche" },
-  { value: "guava", label: "Guava" },
   { value: "pineapple", label: "Pineapple" },
   { value: "strawberry", label: "Strawberry" },
   { value: "nutella", label: "Nutella" },
-];
-
-const cakeFrostingOptions = [
-  { value: "meringue", label: "Meringue frosting" },
-  { value: "whipped-icing", label: "Whipped icing frosting" },
 ];
 
 const cakeColorOptions = [
@@ -253,7 +243,6 @@ const cakeColorOptions = [
 ];
 
 const cakeProductOptions = [
-  { value: "rose-cake", label: "Rose Cake", src: "/images/food/Rose Cake.png" },
   { value: "cookie-cake", label: "Cookie Cake", src: "/images/food/Cookie Cake.png" },
   {
     value: "strawberry-cake",
@@ -282,10 +271,9 @@ const defaultCakeOrder = {
   productKey: "cookie-cake",
   eventType: "birthday",
   cakeSize: "8-inch",
-  flavor: "yellow",
+  flavor: "vanilla",
   filling: "dulce-de-leche",
   extraFilling: "none",
-  frosting: "meringue",
   outsideColor: "white",
   inscription: "",
   notes: "",
@@ -314,6 +302,7 @@ const defaultCheckoutDetails = {
   customerName: "",
   phone: "",
   email: "",
+  discountCode: "",
 };
 
 const getLocalDateInputValue = (date = new Date(), offsetDays = 0) => {
@@ -370,6 +359,13 @@ const formatPickupTime = (value) => {
 const isCakeOrderPath = (pathname = "") =>
   pathname === "/cake-order" || pathname.endsWith("/cake-order.html");
 
+const cartCakeDiscountCode = "99percent";
+
+const normalizeDiscountCode = (value = "") => String(value).trim().toLowerCase();
+
+const hasCakeDiscount = (discountCode = "") =>
+  normalizeDiscountCode(discountCode) === cartCakeDiscountCode;
+
 const buildCartPaymentPayload = (items, checkout) => ({
   orderType: "cart",
   cart: {
@@ -412,6 +408,23 @@ const getCartItemPrice = (item) =>
 const getCartTotal = (items) =>
   items.reduce((sum, item) => sum + getCartItemPrice(item), 0);
 
+const getCartDiscount = (items, checkout = {}) => {
+  if (!hasCakeDiscount(checkout.discountCode)) {
+    return 0;
+  }
+
+  return items.reduce((sum, item) => {
+    if (item.type !== "cake") {
+      return sum;
+    }
+
+    return sum + getCartItemPrice(item) * 0.99;
+  }, 0);
+};
+
+const getDiscountedCartTotal = (items, checkout = {}) =>
+  Math.max(0, getCartTotal(items) - getCartDiscount(items, checkout));
+
 const getCartItemSummaryLines = (item) => {
   if (item.type === "cake") {
     const product = getCakeProduct(item.order.productKey);
@@ -419,7 +432,6 @@ const getCartItemSummaryLines = (item) => {
     const flavor = findOption(cakeFlavorOptions, item.order.flavor);
     const filling = findOption(cakeFillingOptions, item.order.filling);
     const extraFilling = findOption(cakeFillingOptions, item.order.extraFilling);
-    const frosting = findOption(cakeFrostingOptions, item.order.frosting);
     const outsideColor = findOption(cakeColorOptions, item.order.outsideColor);
 
     return [
@@ -428,7 +440,6 @@ const getCartItemSummaryLines = (item) => {
       `Extra filling: ${
         extraFilling.value === "none" ? "None" : `${extraFilling.label} (+$10)`
       }`,
-      `Frosting: ${frosting.label}`,
       `Color: ${outsideColor.label}`,
       `Message: ${item.order.inscription || "None"}`,
     ];
@@ -571,7 +582,6 @@ const buildCakeReceiptRows = (order, submittedAt) => {
   const flavor = findOption(cakeFlavorOptions, order.flavor);
   const filling = findOption(cakeFillingOptions, order.filling);
   const extraFilling = findOption(cakeFillingOptions, order.extraFilling);
-  const frosting = findOption(cakeFrostingOptions, order.frosting);
   const outsideColor = findOption(cakeColorOptions, order.outsideColor);
   const pricing = getCakeTotal(order);
 
@@ -591,7 +601,6 @@ const buildCakeReceiptRows = (order, submittedAt) => {
       "Extra filling",
       extraFilling.value === "none" ? "No extra filling" : `${extraFilling.label} (+$10)`,
     ],
-    ["Frosting", frosting.label],
     ["Outside color", outsideColor.label],
     ["Cake message", order.inscription || "No message"],
     ["Estimated paid total", `$${pricing.total.toFixed(2)}`],
@@ -624,6 +633,8 @@ const buildCupcakeReceiptRows = (order, submittedAt) => {
 };
 
 const buildCartReceiptRows = (cart, submittedAt) => {
+  const discountAmount = getCartDiscount(cart.items, cart.checkout);
+  const discountedTotal = getDiscountedCartTotal(cart.items, cart.checkout);
   const rows = [
     ["Order type", "Custom order cart"],
     ["Submitted", formatSubmittedAt(submittedAt)],
@@ -633,7 +644,9 @@ const buildCartReceiptRows = (cart, submittedAt) => {
     ["Pickup date", cart.checkout.pickupDate || "Not selected"],
     ["Pickup time", formatPickupTime(cart.checkout.pickupTime)],
     ["Items in cart", String(cart.items.length)],
-    ["Estimated paid total", `$${getCartTotal(cart.items).toFixed(2)}`],
+    ["Discount code", hasCakeDiscount(cart.checkout.discountCode) ? cartCakeDiscountCode : "None"],
+    ...(discountAmount ? [["Cake discount", `-$${discountAmount.toFixed(2)}`]] : []),
+    ["Estimated paid total", `$${discountedTotal.toFixed(2)}`],
   ];
 
   cart.items.forEach((item, index) => {
@@ -1265,6 +1278,8 @@ function CustomOrderSection() {
   const cartPayload = buildCartPaymentPayload(cartItems, checkoutDetails);
   const cartReadyForPayment = isCartReadyForPayment(cartItems, checkoutDetails);
   const cartTotal = getCartTotal(cartItems);
+  const cartDiscount = getCartDiscount(cartItems, checkoutDetails);
+  const discountedCartTotal = getDiscountedCartTotal(cartItems, checkoutDetails);
 
   return (
     <section className="cake-checkout" id="cake-order" aria-labelledby="custom-order-title">
@@ -1338,6 +1353,8 @@ function CustomOrderSection() {
           payload={cartPayload}
           readyForPayment={cartReadyForPayment}
           cartTotal={cartTotal}
+          cartDiscount={cartDiscount}
+          discountedCartTotal={discountedCartTotal}
         />
       </div>
     </section>
@@ -1361,7 +1378,6 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
   const flavor = findOption(cakeFlavorOptions, order.flavor);
   const filling = findOption(cakeFillingOptions, order.filling);
   const extraFilling = findOption(cakeFillingOptions, order.extraFilling);
-  const frosting = findOption(cakeFrostingOptions, order.frosting);
   const outsideColor = findOption(cakeColorOptions, order.outsideColor);
   const pricing = getCakeTotal(order);
 
@@ -1426,7 +1442,7 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
         <article className="cake-step">
           <span>1</span>
           <strong>Customize</strong>
-          <p>Choose size, flavor, filling, frosting, colors, and message.</p>
+          <p>Choose size, flavor, filling, colors, and message.</p>
         </article>
         <article className="cake-step">
           <span>2</span>
@@ -1477,17 +1493,6 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
           </label>
 
           <label className="form-field">
-            <span>Frosting</span>
-            <select name="frosting" value={order.frosting} onChange={updateOrder}>
-              {cakeFrostingOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="form-field">
             <span>Included filling</span>
             <select name="filling" value={order.filling} onChange={updateOrder}>
               {cakeFillingOptions.map((option) => (
@@ -1499,7 +1504,7 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
             <small>One filling is included.</small>
           </label>
 
-          <label className="form-field">
+          <label className="form-field form-field-full">
             <span>Extra filling</span>
             <select name="extraFilling" value={order.extraFilling} onChange={updateOrder}>
               <option value="none">No extra filling</option>
@@ -1582,10 +1587,6 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
             </dd>
           </div>
           <div>
-            <dt>Frosting</dt>
-            <dd>{frosting.label}</dd>
-          </div>
-          <div>
             <dt>Color</dt>
             <dd>{outsideColor.label}</dd>
           </div>
@@ -1597,13 +1598,14 @@ function CakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdit }
       </section>
 
       <div className="cake-summary-note">
-        <p>Cake sizes are 6&quot; for $65, 8&quot; for $75, and 10&quot; for $85.</p>
+        <p>Cake sizes are 6&quot; for $80, 8&quot; for $90, and 10&quot; for $100.</p>
         <p>One filling is included, and an extra filling adds $10.</p>
         <p>{order.notes || "Add notes if you have a theme, writing request, or other special instruction."}</p>
       </div>
 
       <div className="cake-terms-box" aria-label="Cake order terms">
         <p>WE RESERVE THE RIGHT TO CANCEL ANY ORDER.</p>
+        <p>ALL SALES ARE FINAL. THERE ARE NO REFUNDS.</p>
         <p>WARNING: CAKES MAY CONTAIN THE FOLLOWING ALLERGENS: EGGS, MILK, PEANUTS, WHEAT, SOY.</p>
         <p className="cake-terms-warning">
           WARNING: CAKES CONTAIN PLASTIC OR WOODEN STICKS INSIDE FOR SUPPORT.
@@ -1827,6 +1829,8 @@ function CartCheckoutPanel({
   payload,
   readyForPayment,
   cartTotal,
+  cartDiscount,
+  discountedCartTotal,
 }) {
   return (
     <aside
@@ -1946,17 +1950,25 @@ function CartCheckoutPanel({
 
       <div className="cake-summary-note">
         <p>Cart total: ${cartTotal.toFixed(2)}</p>
-        <p>
-          Every product in the cart keeps its own custom details, and checkout
-          happens one time at the end.
-        </p>
+        {cartDiscount ? <p>Discount code {cartCakeDiscountCode} applied: -${cartDiscount.toFixed(2)}</p> : null}
+        <label className="form-field form-field-full">
+          <span>Discount code</span>
+          <input
+            name="discountCode"
+            placeholder="Enter code"
+            type="text"
+            value={checkoutDetails.discountCode}
+            onChange={updateCheckoutDetails}
+          />
+        </label>
+        <p>Enter your discount code here if you have one.</p>
       </div>
 
       <div className="cake-summary-actions">
         <SquareCheckoutButton
           payload={payload}
           disabled={!readyForPayment}
-          label={`Pay $${cartTotal.toFixed(2)} with Square`}
+          label={`Pay $${discountedCartTotal.toFixed(2)} with Square`}
         />
       </div>
     </aside>
