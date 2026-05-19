@@ -359,12 +359,12 @@ const formatPickupTime = (value) => {
 const isCakeOrderPath = (pathname = "") =>
   pathname === "/cake-order" || pathname.endsWith("/cake-order.html");
 
-const cartCakeDiscountCode = "99percent";
+const cartDiscountCode = "99percent";
 
 const normalizeDiscountCode = (value = "") => String(value).trim().toLowerCase();
 
-const hasCakeDiscount = (discountCode = "") =>
-  normalizeDiscountCode(discountCode) === cartCakeDiscountCode;
+const hasCartDiscount = (discountCode = "") =>
+  normalizeDiscountCode(discountCode) === cartDiscountCode;
 
 const buildCartPaymentPayload = (items, checkout) => ({
   orderType: "cart",
@@ -409,17 +409,11 @@ const getCartTotal = (items) =>
   items.reduce((sum, item) => sum + getCartItemPrice(item), 0);
 
 const getCartDiscount = (items, checkout = {}) => {
-  if (!hasCakeDiscount(checkout.discountCode)) {
+  if (!hasCartDiscount(checkout.discountCode)) {
     return 0;
   }
 
-  return items.reduce((sum, item) => {
-    if (item.type !== "cake") {
-      return sum;
-    }
-
-    return sum + getCartItemPrice(item) * 0.99;
-  }, 0);
+  return items.reduce((sum, item) => sum + getCartItemPrice(item) * 0.99, 0);
 };
 
 const getDiscountedCartTotal = (items, checkout = {}) =>
@@ -644,8 +638,8 @@ const buildCartReceiptRows = (cart, submittedAt) => {
     ["Pickup date", cart.checkout.pickupDate || "Not selected"],
     ["Pickup time", formatPickupTime(cart.checkout.pickupTime)],
     ["Items in cart", String(cart.items.length)],
-    ["Discount code", hasCakeDiscount(cart.checkout.discountCode) ? cartCakeDiscountCode : "None"],
-    ...(discountAmount ? [["Cake discount", `-$${discountAmount.toFixed(2)}`]] : []),
+    ["Discount code", hasCartDiscount(cart.checkout.discountCode) ? cartDiscountCode : "None"],
+    ...(discountAmount ? [["Discount applied", `-$${discountAmount.toFixed(2)}`]] : []),
     ["Estimated paid total", `$${discountedTotal.toFixed(2)}`],
   ];
 
@@ -1950,7 +1944,7 @@ function CartCheckoutPanel({
 
       <div className="cake-summary-note">
         <p>Cart total: ${cartTotal.toFixed(2)}</p>
-        {cartDiscount ? <p>Discount code {cartCakeDiscountCode} applied: -${cartDiscount.toFixed(2)}</p> : null}
+        {cartDiscount ? <p>Discount code {cartDiscountCode} applied: -${cartDiscount.toFixed(2)}</p> : null}
         <label className="form-field form-field-full">
           <span>Discount code</span>
           <input

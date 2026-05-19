@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 const SQUARE_API_VERSION = "2026-01-22";
 const SQUARE_API_URL = "https://connect.squareup.com/v2/online-checkout/payment-links";
-const CART_CAKE_DISCOUNT_CODE = "99percent";
+const CART_DISCOUNT_CODE = "99percent";
 
 const cakeSizeConfig = {
   "6-inch": { label: '6"', amount: 8000 },
@@ -57,8 +57,8 @@ const requiredString = (value) => typeof value === "string" && value.trim().leng
 const getLabel = (group, value) => optionLabels[group]?.[value] ?? value ?? "";
 const getCakeProductLabel = (value) => cakeProductLabels[value] || value || "cake";
 const normalizeDiscountCode = (value = "") => String(value).trim().toLowerCase();
-const hasCakeDiscount = (discountCode = "") =>
-  normalizeDiscountCode(discountCode) === CART_CAKE_DISCOUNT_CODE;
+const hasCartDiscount = (discountCode = "") =>
+  normalizeDiscountCode(discountCode) === CART_DISCOUNT_CODE;
 
 const readRawBody = async (req) => {
   if (typeof req.body === "string") {
@@ -273,7 +273,7 @@ const buildCartItemSummary = (item, discountCode = "") => {
     const extraFillingCharge =
       item.order?.extraFilling && item.order.extraFilling !== "none" ? 1000 : 0;
     const amount = size.amount + extraFillingCharge;
-    const discountedAmount = hasCakeDiscount(discountCode)
+    const discountedAmount = hasCartDiscount(discountCode)
       ? Math.max(1, Math.round(amount * 0.01))
       : amount;
 
@@ -294,8 +294,8 @@ const buildCartItemSummary = (item, discountCode = "") => {
         `Outside cake color: ${getLabel("outsideColor", item.order?.outsideColor)}`,
         `Message on cake: ${item.order?.inscription || "None"}`,
         `Cake notes: ${item.order?.notes || "None"}`,
-        ...(hasCakeDiscount(discountCode)
-          ? [`Discount code: ${CART_CAKE_DISCOUNT_CODE} (99% off applied)`]
+        ...(hasCartDiscount(discountCode)
+          ? [`Discount code: ${CART_DISCOUNT_CODE} (99% off applied)`]
           : []),
       ].join(" | ").slice(0, 500),
     };
@@ -305,10 +305,14 @@ const buildCartItemSummary = (item, discountCode = "") => {
     const quantity = Math.max(1, Number(item.order?.quantity) || 0);
     const fillingSurcharge =
       item.order?.filling && item.order.filling !== "none" ? quantity * 50 : 0;
+    const amount = quantity * 350 + fillingSurcharge;
+    const discountedAmount = hasCartDiscount(discountCode)
+      ? Math.max(1, Math.round(amount * 0.01))
+      : amount;
 
     return {
       name: `Custom cupcakes (${quantity})`,
-      amount: quantity * 350 + fillingSurcharge,
+      amount: discountedAmount,
       note: [
         `Quantity: ${quantity}`,
         `Cupcake flavor: ${getLabel("flavor", item.order?.flavor)}`,
@@ -317,6 +321,9 @@ const buildCartItemSummary = (item, discountCode = "") => {
         }`,
         `Cupcake color: ${getLabel("outsideColor", item.order?.outsideColor)}`,
         `Notes: ${item.order?.notes || "None"}`,
+        ...(hasCartDiscount(discountCode)
+          ? [`Discount code: ${CART_DISCOUNT_CODE} (99% off applied)`]
+          : []),
       ].join(" | ").slice(0, 500),
     };
   }
@@ -351,7 +358,7 @@ const buildCartCheckoutRequest = (cart, siteOrigin, supportEmail) => {
     `Phone: ${checkout.phone}`,
     `Email: ${checkout.email}`,
     `Items in cart: ${items.length}`,
-    `Discount code: ${hasCakeDiscount(discountCode) ? CART_CAKE_DISCOUNT_CODE : "None"}`,
+    `Discount code: ${hasCartDiscount(discountCode) ? CART_DISCOUNT_CODE : "None"}`,
     `Estimated total: $${(lineItems.reduce((sum, item) => sum + item.base_price_money.amount, 0) / 100).toFixed(2)}`,
   ].join(" | ").slice(0, 500);
 

@@ -1,5 +1,9 @@
 import crypto from "node:crypto";
-import {appendOrderRecord} from "./_order-dashboard-store.js";
+import {
+  appendOrderRecord,
+  hasProcessedPayment,
+  markProcessedPayment,
+} from "./_order-dashboard-store.js";
 
 const SQUARE_API_VERSION = "2026-01-22";
 const SQUARE_GET_PAYMENT_URL = "https://connect.squareup.com/v2/payments";
@@ -529,6 +533,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ignored: true, reason: `Payment status is ${payment.status}` });
     }
 
+    if (await hasProcessedPayment(payment.id)) {
+      return res.status(200).json({
+        ignored: true,
+        reason: `Notification already sent for payment ${payment.id}`,
+      });
+    }
+
     const dashboardRecord = buildDashboardRecord(payment);
     try {
       await appendOrderRecord(dashboardRecord);
@@ -537,6 +548,7 @@ export default async function handler(req, res) {
     }
 
     const notification = await sendOrderNotification(payment);
+    await markProcessedPayment(payment.id);
     return res.status(200).json({ ok: true, notificationSent: true, ...notification });
   } catch (error) {
     return res.status(500).json({
