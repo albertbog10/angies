@@ -208,7 +208,7 @@ const buildCupcakeCheckoutRequest = (order, siteOrigin, supportEmail) => {
       name: "Custom cupcakes",
       quantity: String(quantity),
       base_price_money: {
-        amount: 2000,
+        amount: 350,
         currency: "USD",
       },
     },
@@ -305,7 +305,7 @@ const buildCartItemSummary = (item, discountCode = "") => {
     const quantity = Math.max(1, Number(item.order?.quantity) || 0);
     const fillingSurcharge =
       item.order?.filling && item.order.filling !== "none" ? quantity * 50 : 0;
-    const amount = quantity * 2000 + fillingSurcharge;
+    const amount = quantity * 350 + fillingSurcharge;
     const discountedAmount = hasCartDiscount(discountCode)
       ? Math.max(1, Math.round(amount * 0.01))
       : amount;

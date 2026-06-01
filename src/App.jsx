@@ -330,7 +330,7 @@ const getCakeTotal = (order) => {
 
 const getCupcakeTotal = (order) => {
   const quantity = Math.max(1, Number(order.quantity) || 0);
-  const basePricePerCupcake = 20;
+  const basePricePerCupcake = 3.5;
   const fillingPricePerCupcake = order.filling && order.filling !== "none" ? 0.5 : 0;
 
   return {
@@ -1704,7 +1704,7 @@ function CupcakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdi
               value={order.quantity}
               onChange={updateOrder}
             />
-            <small>$20.00 per cupcake.</small>
+            <small>$3.50 per cupcake.</small>
           </label>
 
           <label className="form-field">
@@ -1784,7 +1784,7 @@ function CupcakeProductBuilder({ order, setOrder, onSave, isEditing, onCancelEdi
       </section>
 
       <div className="cake-summary-note">
-        <p>Cupcakes are $20 each no matter the amount.</p>
+        <p>Cupcakes are $3.50 each no matter the amount.</p>
         <p>If you add filling, it applies to every cupcake and adds $0.50 per cupcake.</p>
         <p>{order.notes || "Add notes if you have a theme, topper idea, or other special instruction."}</p>
       </div>
