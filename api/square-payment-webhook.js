@@ -190,6 +190,17 @@ const mergeOrderDetailsIntoPayment = (payment = {}, order = {}) => {
   };
 };
 
+const onlineOrderMarkers = [
+  "Order type: Custom cake",
+  "Order type: Custom cupcakes",
+  "Order type: Custom order cart",
+];
+
+const isOnlineStoreOrder = (payment = {}) => {
+  const noteText = String(payment.note || payment.payment_note || "");
+  return onlineOrderMarkers.some((marker) => noteText.includes(marker));
+};
+
 const hasTwilioConfig = () =>
   Boolean(
     process.env.TWILIO_ACCOUNT_SID &&
@@ -527,6 +538,13 @@ export default async function handler(req, res) {
 
     if (!payment) {
       throw new Error("Unable to load payment details for webhook notification.");
+    }
+
+    if (!isOnlineStoreOrder(payment)) {
+      return res.status(200).json({
+        ignored: true,
+        reason: "Payment did not come from the online store.",
+      });
     }
 
     if (payment.status !== "COMPLETED") {
